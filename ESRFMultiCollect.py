@@ -430,6 +430,9 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
     @task
     def write_input_files(self, collection_id):
         # assumes self.xds_directory and self.mosflm_directory are valid
+        if (not self.bl_control.lims) or (not self.bl_config.input_files_server):
+            return
+
         conn = httplib.HTTPConnection(self.bl_config.input_files_server)
         for input_file_dir, file_prefix in ((self.raw_data_input_file_dir, "../.."), (self.xds_directory, "../links")): 
 	  xds_input_file = os.path.join(input_file_dir, "XDS.INP")

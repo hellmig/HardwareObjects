@@ -6,6 +6,7 @@ the QueueModel.
 import copy
 import os
 import queue_model_enumerables_v1 as queue_model_enumerables
+import logging
 
 class TaskNode(object):
     """
@@ -753,16 +754,18 @@ class PathTemplate(object):
         """
         folders = self.directory.split('/')
         endstation_name = None
+
+        logging.info("PathTemplate: getting_archive_directory from %s"  % (self.directory))
         
         if 'visitor' in folders:
             endstation_name = folders[4]
-            folders[2] = 'pyarch'
-            temp = folders[3]
-            folders[3] = folders[4]
-            folders[4] = temp
+            folders[2] = 'ispyb'
+            #temp = folders[3]
+            #folders[3] = folders[4]
+            #folders[4] = temp
         else:
             endstation_name = folders[2]
-            folders[2] = 'pyarch'
+            folders[2] = 'ispyb'
             folders[3] = endstation_name
 
 

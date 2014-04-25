@@ -45,6 +45,7 @@ def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMM_Hor, pixelsPerMM_
     while True:
       USER_CLICKED_EVENT = AsyncResult()
       x, y = USER_CLICKED_EVENT.get()
+      logging.info(" user clicked at %s,%s" % (str(x), str(y)))
       X.append(x/float(pixelsPerMM_Hor))
       Y.append(y/float(pixelsPerMM_Ver))
       phi_positions.append(-math.radians(phi.getPosition()))
@@ -75,6 +76,8 @@ def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMM_Hor, pixelsPerMM_
                    phiz: float(phiz.getPosition() + d_phiz[0,0]) }
     return centredPos
   except:
+    import traceback
+    logging.info(traceback.format_exc())
     phi.move(phiSavedPosition)    
     raise
 

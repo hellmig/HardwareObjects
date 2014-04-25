@@ -302,7 +302,7 @@ class BeamlineSetup(HardwareObject):
         path_template.wedge_prefix = ''
         path_template.run_number = self[parent_key].getProperty('run_number')
         path_template.suffix = self.session_hwobj["file_info"].getProperty('file_suffix')
-        path_template.precision = '04'
+        path_template.precision = self.session_hwobj.default_precision
         path_template.start_num = int(self[parent_key].getProperty('start_image_number'))
         path_template.num_files = int(self[parent_key].getProperty('number_of_images'))
 

@@ -66,6 +66,7 @@ class AbstractMultiCollect(object):
         self.current_lims_sample = None
         self.__safety_shutter_close_task = None
 
+        self.image_file_format = "%(prefix)s_%(run_number)s_%%04d.%(suffix)s"
 
     def setControlObjects(self, **control_objects):
       self.bl_control = BeamlineControl(**control_objects)
@@ -390,7 +391,7 @@ class AbstractMultiCollect(object):
         file_parameters = data_collect_parameters["fileinfo"]
 
         file_parameters["suffix"] = self.bl_config.detector_fileext
-        image_file_template = "%(prefix)s_%(run_number)s_%%04d.%(suffix)s" % file_parameters
+        image_file_template = self.image_file_format % file_parameters
         file_parameters["template"] = image_file_template
 
         archive_directory = self.get_archive_directory(file_parameters["directory"])
@@ -422,6 +423,7 @@ class AbstractMultiCollect(object):
               
         # Creating the directory for images and processing information
         self.create_directories(file_parameters['directory'],  file_parameters['process_directory'])
+        logging.info("now creating input files")
         self.xds_directory, self.mosflm_directory = self.prepare_input_files(file_parameters["directory"], file_parameters["prefix"], file_parameters["run_number"], file_parameters['process_directory'])
         data_collect_parameters['xds_dir'] = self.xds_directory
 
@@ -634,8 +636,8 @@ class AbstractMultiCollect(object):
                   except:
                     logging.getLogger("HWR").exception("Could not store data collection into LIMS")
 
-            if self.bl_control.lims and self.bl_config.input_files_server:
-                self.write_input_files(self.collection_id, wait=False) 
+            #if self.bl_control.lims and self.bl_config.input_files_server:
+            self.write_input_files(self.collection_id, wait=False) 
 
             self.prepare_acquisition(1 if data_collect_parameters.get("dark", 0) else 0,
                                      wedges_to_collect[0][0],

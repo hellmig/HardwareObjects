@@ -665,7 +665,8 @@ class DataCollectionQueueEntry(BaseQueueEntry):
                     log.info("Moving sample to given position ...")
                     list_item.setText(1, "Moving sample")
                 else:
-                    self.collect_hwobj.getChannelObject("helical").setValue(0)
+                    #self.collect_hwobj.getChannelObject("helical").setValue(0)
+                    pass
 
                 empty_cpos = queue_model_objects.CentredPosition()
 
@@ -1032,10 +1033,12 @@ class EnergyScanQueueEntry(BaseQueueEntry):
         scan_file_path = os.path.join(energy_scan.path_template.directory,
                                       energy_scan.path_template.get_prefix())
 
+        logging.info("energy_scan_finished: file_path: %s " % scan_file_path)
         scan_file_archive_path = os.path.join(energy_scan.path_template.\
                                               get_archive_directory(),
                                               energy_scan.path_template.get_prefix())
 
+        logging.info("energy_scan_finished: doingChooch ")
         (pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, rm,
          chooch_graph_x, chooch_graph_y1, chooch_graph_y2, title) = \
          self.energy_scan_hwobj.doChooch(None, energy_scan.element_symbol,
@@ -1048,6 +1051,7 @@ class EnergyScanQueueEntry(BaseQueueEntry):
         # This does not always apply, update model so
         # that its possible to access the sample directly from
         # the EnergyScan object.
+        logging.info("energy_scan_finished: showing results ")
         sample = self.get_view().parent().parent().get_model()
         sample.crystals[0].energy_scan_result.peak = pk
         sample.crystals[0].energy_scan_result.inflection = ip
