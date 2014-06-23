@@ -755,21 +755,23 @@ class PathTemplate(object):
         folders = self.directory.split('/')
         endstation_name = None
 
+        archive_directory = self.directory
+        archive_directory = archive_directory.replace("/data/data1/visitor", "/data/ispyb")
+        archive_directory = archive_directory.replace("/data/data1/inhouse", "/data/ispyb")
+        archive_directory = archive_directory.replace("/data/data1", "/data/ispyb")
+
         logging.info("PathTemplate: getting_archive_directory from %s"  % (self.directory))
         
-        if 'visitor' in folders:
-            endstation_name = folders[4]
-            folders[2] = 'ispyb'
-            #temp = folders[3]
-            #folders[3] = folders[4]
-            #folders[4] = temp
-        else:
-            endstation_name = folders[2]
-            folders[2] = 'ispyb'
-            folders[3] = endstation_name
-
-
-        archive_directory = '/' + os.path.join(*folders[1:])
+        #if 'visitor' in folders:
+        #    folders[2] = "data"
+        #    folders[3] = 'ispyb'
+        #else:
+        #    #endstation_name = folders[2]
+        #    folders[2] = 'data'
+        #    folders[3] = 'ispyb'
+#
+#        archive_directory = '/' + os.path.join(*folders[2:])
+        logging.info("Archive direcotry is %s" % archive_directory)
 
         return archive_directory
 
