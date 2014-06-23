@@ -111,7 +111,7 @@ class myimage:
         return self.imgcopy
 
 
-def take_snapshots(light, light_motor, phi, zoom, drawing):
+def take_snapshots_original(light, light_motor, phi, zoom, drawing):
   centredImages = []
 
   if light is not None:
@@ -133,6 +133,7 @@ def take_snapshots(light, light_motor, phi, zoom, drawing):
 
     while light.getWagoState()!="in":
       time.sleep(0.5)
+
   for i in range(4):
      logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d", i+1)
      centredImages.append((phi.getPosition(),str(myimage(drawing))))
@@ -141,6 +142,41 @@ def take_snapshots(light, light_motor, phi, zoom, drawing):
   centredImages.reverse() # snapshot order must be according to positive rotation direction
 
   return centredImages
+
+def take_snapshots(light, lightmot, phi, zoom, drawing):
+  centredImages = []
+
+  if light is not None:
+    lightwas = light.getWagoState()
+
+  if light is not None:
+    logging.getLogger("HWR").info("MiniDiff: turning light on for snaphsots (was %s)" % lightwas)
+    light.wagoIn()
+
+    while light.getWagoState() != "in":
+      time.sleep(0.5)
+
+    lightmot.move(1)
+    time.sleep(0.3)
+
+  for i in range(4):
+     logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d", i+1)
+     centredImages.append((phi.getPosition(),str(myimage(drawing))))
+     logging.getLogger("HWR").info("MiniDiff: moving phi by -90 ")
+     phi.syncMoveRelative(-90)
+     logging.getLogger("HWR").info("MiniDiff: phi finished moving")
+
+  if light is not None:
+    if lightwas == "out":
+       light.wagoOut()
+       logging.getLogger("HWR").info("MiniDiff: turning light off after snaphsots")
+       while light.getWagoState()!="out":
+           time.sleep(0.5)
+
+  centredImages.reverse() # snapshot order must be according to positive rotation direction
+
+  return centredImages
+
 
 
 class MiniDiff(Equipment):
@@ -270,6 +306,7 @@ class MiniDiff(Equipment):
             self.connect(self.lightWago, 'wagoStateChanged', self.wagoLightStateChanged)
         else:
             logging.getLogger("HWR").warning('MiniDiff: wago light is not defined in minidiff equipment %s', str(self.name()))
+
         if self.aperture is not None:
             self.connect(self.aperture, 'predefinedPositionChanged', self.apertureChanged)
             self.connect(self.aperture, 'positionReached', self.apertureChanged)
@@ -452,6 +489,9 @@ class MiniDiff(Equipment):
         return self.imgHeight / 2
 
     def getBeamInfo(self, update_beam_callback):
+        if self.aperture is not None:
+              curpos = self.aperture.getCurrentPositionName()
+              logging.getLogger("HWR").info(" Aperture is %s \n" % curpos)
         get_beam_info = self.getCommandObject("getBeamInfo")
         get_beam_info(callback=update_beam_callback, error_callback=None, wait=True)
 

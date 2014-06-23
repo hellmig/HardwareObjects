@@ -27,6 +27,7 @@ BeamlineControl = collections.namedtuple('BeamlineControl',
 
 BeamlineConfig = collections.namedtuple('BeamlineConfig',
                                         ['directory_prefix',
+                                         'synchrotron_name',
                                          'default_exposure_time',
                                          'default_number_of_passes',
                                          'maximum_radiation_exposure',
@@ -60,7 +61,7 @@ class AbstractMultiCollect(object):
 
     def __init__(self):
         self.bl_control = BeamlineControl(*[None]*12)
-        self.bl_config = BeamlineConfig(*[None]*27)
+        self.bl_config = BeamlineConfig(*[None]*28)
         self.data_collect_task = None
         self.oscillations_history = []
         self.current_lims_sample = None
@@ -520,6 +521,8 @@ class AbstractMultiCollect(object):
                     f.close()
                   except:
                     pass
+                else:
+                  f.close()
 
                 data_collect_parameters['xtalSnapshotFullPath%i' % snapshot_i] = full_snapshot
 
@@ -861,7 +864,7 @@ class AbstractMultiCollect(object):
       else:
         logging.info("AUTO PROCESSING: %s, %s, %s, %s, %s, %s, %r, %r", process_event, EDNA_files_dir, anomalous, residues, inverse_beam, do_inducedraddam, spacegroup, cell)
             
-        try: 
+        try:
             autoprocessing.start(self["auto_processing"], process_event, processAnalyseParams)
         except:
             logging.getLogger().exception("Error starting processing")
