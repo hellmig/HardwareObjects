@@ -226,7 +226,7 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           undulators = []
 
         self.setBeamlineConfiguration(directory_prefix = self.getProperty("directory_prefix"),
-                                      #synchrotron_name = bcm_pars.getProperty("synchrotron_name"),
+                                      synchrotron_name = bcm_pars.getProperty("synchrotron_name"),
                                       default_exposure_time = bcm_pars.getProperty("default_exposure_time"),
                                       default_number_of_passes = bcm_pars.getProperty("default_number_of_passes"),
                                       maximum_radiation_exposure = bcm_pars.getProperty("maximum_radiation_exposure"),
@@ -539,7 +539,7 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           if endImageNumber_bkg > endImageNumber: 
              endImageNumber_bkg = endImageNumber
 
-          xdswait_exposure_time = osc_seq["exposure_time"] + 20
+          xdswait_exposure_time = int(osc_seq["exposure_time"]) + 20
 
           try:
               valdict = {
@@ -653,15 +653,16 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
 
 
     def get_transmission(self):
-        return self.bl_control.transmission.getAttFactor()
+        #return self.bl_control.transmission.getAttFactor()
+        return None
 
 
     def get_undulators_gaps(self):
         und_gaps = [None]*3
-        i = 0
-        for undulator_cfg in self.bl_config.undulators:
-            und_gaps[i]=self.bl_control.undulators.getUndulatorGap(undulator_cfg.getProperty("type"))
-            i+=1
+        #i = 0
+        #for undulator_cfg in self.bl_config.undulators:
+        #    und_gaps[i]=self.bl_control.undulators.getUndulatorGap(undulator_cfg.getProperty("type"))
+        #    i+=1
         return und_gaps
 
 
@@ -811,40 +812,57 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
       return []
 
 
+#    def get_archive_directory(self, directory):
+#        # Return the same directory base + /archive
+#
+#        logging.getLogger().info("In get_archive_directory")
+#        if not directory:
+#           return directory
+#
+#        try:
+#           logging.getLogger().info("Getting archive directory name from %s", directory)
+#           dirname = os.path.abspath(directory)
+#
+#           if dirname[-1] != os.path.sep:
+#              dirname += os.path.sep
+#
+#           parts = dirname.split(os.path.sep)
+#           archive_dir_base = os.path.sep + os.path.join( *parts[1:-2] )
+#           logging.getLogger().info("archive_dir_base:%s", archive_dir_base)
+#           #Set up the archiving directory if the user is logged in 
+#           #Check if the original path is /data/data1/mx... AN 25/03/2014
+#
+#           if (archive_dir_base.startswith("/data/data1/visitor") or archive_dir_base.startswith("/data/data1/inhouse")):
+#               archive_dir_base = archive_dir_base.replace("/data/data1/visitor/", "/data/ispyb/")
+#
+#
+#           archive_dir = os.path.join( archive_dir_base, "archive")
+#           #archive_dir = os.path.join(archive_dir_base, "archive")
+#           logging.getLogger().info("archive_dir:%s", archive_dir)
+#
+#           if not os.path.exists(archive_dir):
+#               os.makedirs(archive_dir)
+#           return archive_dir
+#        except:
+#           import traceback
+#           traceback.print_exc()
+#           return directory
+
     def get_archive_directory(self, directory):
-        # Return the same directory base + /archive
+        res = None
 
-        logging.getLogger().info("In get_archive_directory")
-        if not directory:
-           return directory
-
+        dir_path_list = directory.split(os.path.sep)
         try:
-           logging.getLogger().info("Getting archive directory name from %s", directory)
-           dirname = os.path.abspath(directory)
+          suffix_path=os.path.join(*dir_path_list[4:])
+        except TypeError:
+          return None
+        else:
+          if 'inhouse' in directory:
+            archive_dir = os.path.join('/data/ispyb/', dir_path_list[3], suffix_path)
+          else:
+            archive_dir = os.path.join('/data/ispyb/', dir_path_list[4], *dir_path_list[5:])
+          if archive_dir[-1] != os.path.sep:
+            archive_dir += os.path.sep
 
-           if dirname[-1] != os.path.sep:
-              dirname += os.path.sep
-
-           parts = dirname.split(os.path.sep)
-           archive_dir_base = os.path.sep + os.path.join( *parts[1:-2] )
-           logging.getLogger().info("archive_dir_base:%s", archive_dir_base)
-           #Set up the archiving directory if the user is logged in 
-           #Check if the original path is /data/data1/mx... AN 25/03/2014
-
-           if (archive_dir_base.startswith("/data/data1/visitor") or archive_dir_base.startswith("/data/data1/inhouse")):
-               archive_dir_base = archive_dir_base.replace("/data/data1/", "/data/ispyb/")
-
-
-           archive_dir = os.path.join( archive_dir_base, "archive")
-           #archive_dir = os.path.join(archive_dir_base, "archive")
-           logging.getLogger().info("archive_dir:%s", archive_dir)
-
-           if not os.path.exists(archive_dir):
-               os.makedirs(archive_dir)
-           return archive_dir
-        except:
-           import traceback
-           traceback.print_exc()
-           return directory
-
+          return archive_dir
          
