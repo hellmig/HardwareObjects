@@ -29,7 +29,7 @@ def multiPointCentre(z,phis) :
     return p1
 
 
-def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMM_Hor, pixelsPerMM_Ver, beam_xc, beam_yc, phiy_direction=1):
+def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMmY, pixelsPerMmZ, beam_xc, beam_yc, phiy_direction):
   global USER_CLICKED_EVENT
   X, Y, phi_positions = [], [], []
   centredPosRel = {}
@@ -37,43 +37,42 @@ def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMM_Hor, pixelsPerMM_
   if all([x.isReady() for x in (phi, phiy, phiz, sampx, sampy)]):
     phiSavedPosition = phi.getPosition()
     phiSavedDialPosition = phi.getDialPosition()
+    logging.info(" Phi saved dial position %s",phiSavedDialPosition)
   else:
     raise RuntimeError, "motors not ready"
 
   try:  
-    i = 0
     while True:
       USER_CLICKED_EVENT = AsyncResult()
       x, y = USER_CLICKED_EVENT.get()
       logging.info(" user clicked at %s,%s" % (str(x), str(y)))
-      X.append(x/float(pixelsPerMM_Hor))
-      Y.append(y/float(pixelsPerMM_Ver))
-      phi_positions.append(-math.radians(phi.getPosition()))
+      X.append(x)
+      Y.append(y)
       if len(X) == 3:
         break
       phi.moveRelative(90)
-      i += 1
 
-    Robot_angle = math.radians(0)
-    robotRotMatrix = numpy.matrix([[math.cos(Robot_angle), -math.sin(Robot_angle)],
-                                   [math.sin(Robot_angle), math.cos(Robot_angle)]])
-  
-    Z = robotRotMatrix*numpy.matrix([X,Y])
-    z = Z[1]
-    avg_pos = Z[0].mean()
-    r, a, offset = multiPointCentre(numpy.array(z).flatten(), phi_positions)
-    dy = r * numpy.sin(a)
-    dx = r * numpy.cos(a)
-   
-    d = robotRotMatrix.transpose()*numpy.matrix([[avg_pos],
-                                                 [offset]])
-    d_phiy = d[0] - (beam_xc / float(pixelsPerMM_Hor))
-    d_phiz = d[1] - (beam_yc / float(pixelsPerMM_Ver))
-   
-    centredPos = { sampx: float(sampx.getPosition() + dx),
-                   sampy: float(sampy.getPosition() + dy),
-                   phiy: float(phiy.getPosition() + phiy_direction*d_phiy[0,0]),
-                   phiz: float(phiz.getPosition() + d_phiz[0,0]) }
+    yc = float((Y[0]+Y[2]) / 2)
+    y =  float(Y[0] - yc)
+    x =  float(yc - Y[1])
+    b1 = -math.radians(phiSavedDialPosition)
+    rotMatrix = numpy.matrix([math.cos(b1), -math.sin(b1), math.sin(b1), math.cos(b1)])
+    rotMatrix.shape = (2,2)
+    dx, dy = numpy.dot(numpy.array([x,y]), numpy.array(rotMatrix))/pixelsPerMmY
+    logging.info("x %s, y %s,pixelsPerMmY %s, pixelsPerMmZ %s",x, y, pixelsPerMmY,pixelsPerMmZ) 
+
+    beam_xc_real = beam_xc / float(pixelsPerMmY)
+    beam_yc_real = beam_yc / float(pixelsPerMmZ)
+    y = yc / float(pixelsPerMmZ)
+    x = sum(X) / 3.0 / float(pixelsPerMmY)
+    logging.info("sampx %s, sampy %s, phiy %s, phiz %s", sampx.getPosition(),sampy.getPosition(),phiy.getPosition(),phiz.getPosition())
+    logging.info("y %s, x %s, b1 %s, dx %s, dy %s, beam_xc_real %s, beam_yc_real %s", y,x,b1,dx,dy,beam_xc_real,beam_yc_real)
+    centredPos = { sampx: sampx.getPosition() + float(dx),
+                   sampy: sampy.getPosition() + float(dy),
+                   phiy: phiy.getPosition() + phiy_direction * (x - beam_xc_real),
+                   phiz: phiz.getPosition() + (y - beam_yc_real) }
+    logging.info("after centring, sampx %s, sampy %s, phiy %s, phiz %s",sampx.getPosition() + float(dx),sampy.getPosition() + float(dy), phiy.getPosition() + phiy_direction * (x - beam_xc_real), phiz.getPosition() + (y - beam_yc_real))
+
     return centredPos
   except:
     import traceback
@@ -629,7 +628,6 @@ class MiniDiff(Equipment):
                      self.phiMotor: centred_position.phi,
                      self.phiyMotor: centred_position.phiy,
                      self.phizMotor: centred_position.phiz}
-
         return move_to_centred_position(motor_pos, wait=wait)
       except:
         logging.exception("Could not move to centred position")
