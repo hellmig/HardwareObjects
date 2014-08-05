@@ -401,8 +401,8 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
         i = 1
         logging.info("Creating XDS (MAXLAB) processing input file directories")
 
-        self.xds_template    = "/home/blissadm/mxCuBE/dp_file_templates/xdstemplate_maxlab.inp"
-        self.mosflm_template = "/home/blissadm/mxCuBE/dp_file_templates/mosflmtest.inp"
+        self.xds_template    = "/home/blissadm/mxCuBE-V2.0/dp_file_templates/xdstemplate_maxlab.inp"
+        self.mosflm_template = "/home/blissadm/mxCuBE-V2.0/dp_file_templates/mosflmtemplate_maxlab.inp"
 
         try:
            self.xds_template_buf    = open(self.xds_template).read()
@@ -423,9 +423,8 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
 
         mosflm_input_file_dirname = "mosflm_%s_run%s_%d" % (prefix, run_number, i)
         mosflm_directory = os.path.join(process_directory, mosflm_input_file_dirname)
-
         logging.info("  - mosflm directory: %s", mosflm_directory)
-
+   
         self.raw_data_input_file_dir = os.path.join(files_directory, "process", xds_input_file_dirname)
         self.mosflm_raw_data_input_file_dir = os.path.join(files_directory, "process", mosflm_input_file_dirname)
 
@@ -438,7 +437,7 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           self.create_directories(dir)
           logging.info("Creating MOSFLM processing input file directory: %s", dir)
           os.chmod(dir, 0777)
-
+         
         raw_hkl2000_dir = os.path.join(files_directory, "process", "hkl2000")
         hkl2000_dir = os.path.join(process_directory, "hkl2000")
         for dir in (raw_hkl2000_dir, hkl2000_dir):
@@ -612,32 +611,57 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           mosflm_file.close()
           os.chmod(mosflm_input_file, 0666)
 
-        # also write input file for STAC
-        #for stac_om_input_file_name, stac_om_dir in (("mosflm.descr", self.mosflm_directory), 
-        #                                             ("xds.descr", self.xds_directory),
-        #                                             ("mosflm.descr", self.mosflm_raw_data_input_file_dir),
-        #                                             ("xds.descr", self.raw_data_input_file_dir)):
-        #  stac_om_input_file = os.path.join(stac_om_dir, stac_om_input_file_name)
-        #  conn.request("GET", "/stac.descr/%d" % collection_id)
-        #  stac_om_file = open(stac_om_input_file, "w")
-        #  stac_template = conn.getresponse().read()
-        #  if stac_om_input_file_name.startswith("xds"):
-        #    om_type="xds"
-        #    if stac_om_dir == self.raw_data_input_file_dir:
-        #      om_filename=os.path.join(stac_om_dir, "CORRECT.LP")
-        #    else:
-        #      om_filename=os.path.join(stac_om_dir, "xds_fastproc", "CORRECT.LP")
-        #  else:
-        #    om_type="mosflm"
-        #    om_filename=os.path.join(stac_om_dir, "bestfile.par")
-        #
-        #   stac_om_file.write(stac_template.format(omfilename=om_filename, omtype=om_type, 
-        #                      phi=self.bl_control.diffractometer.phiMotor.getPosition(), 
-        #                      sampx=self.bl_control.diffractometer.sampleXMotor.getPosition(), 
-        #                      sampy=self.bl_control.diffractometer.sampleYMotor.getPosition(), 
-        #                      phiy=self.bl_control.diffractometer.phiyMotor.getPosition()))
-        #   stac_om_file.close()
-        #   os.chmod(stac_om_input_file, 0666)
+        # write input file for STAC, JN,20140709
+        stac_template = "/home/blissadm/mxCuBE-V2.0/dp_file_templates/stactemplate_maxlab.inp"
+        try:
+          stac_template_buf  =open(stac_template).read()
+        except:
+          print "Cannot find template for stac input files "
+          return
+        phi=self.bl_control.diffractometer.phiMotor.getPosition()
+        sampx=self.bl_control.diffractometer.sampleXMotor.getPosition()
+        sampy=self.bl_control.diffractometer.sampleYMotor.getPosition()
+        phiy=self.bl_control.diffractometer.phiyMotor.getPosition()
+        phi=self.bl_control.diffractometer.phiMotor.getPosition()
+         
+        for stac_om_input_file_name, stac_om_dir in (("mosflm.descr", self.mosflm_directory), 
+                                                     ("xds.descr", self.xds_directory),
+                                                     ("mosflm.descr", self.mosflm_raw_data_input_file_dir),
+                                                     ("xds.descr", self.raw_data_input_file_dir)):
+          stac_om_input_file = os.path.join(stac_om_dir, stac_om_input_file_name)
+          stac_om_file = open(stac_om_input_file, "w")
+
+          if stac_om_input_file_name.startswith("xds"):
+            om_type="xds"
+            if stac_om_dir == self.raw_data_input_file_dir:
+              om_filename=os.path.join(stac_om_dir, "CORRECT.LP")
+            else:
+              om_filename=os.path.join(stac_om_dir, "xds_fastproc", "CORRECT.LP")
+          else:
+            om_type="mosflm"
+            om_filename=os.path.join(stac_om_dir, "bestfile.par")
+
+          valdict = {
+                  "omfilename":       om_filename,
+                  "omtype":	      om_type,
+                  "axisStart":        osc_seq["start"],
+                  "kappaStart":       osc_seq["kappaStart"],
+                  "phiStart":         osc_seq["phiStart"],
+                  "sampx":            sampx,
+                  "sampy":            sampy,
+                  "phiy":             phiy,
+                  "phi":              phi,
+               
+          }
+          try:
+             stac_buf  = stac_template_buf % valdict
+          except:
+             import traceback
+             traceback.print_exc()
+
+          stac_om_file.write(stac_buf)
+          stac_om_file.close()
+          os.chmod(stac_om_input_file, 0666)
 
 
     def get_wavelength(self):
@@ -812,41 +836,6 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
       return []
 
 
-#    def get_archive_directory(self, directory):
-#        # Return the same directory base + /archive
-#
-#        logging.getLogger().info("In get_archive_directory")
-#        if not directory:
-#           return directory
-#
-#        try:
-#           logging.getLogger().info("Getting archive directory name from %s", directory)
-#           dirname = os.path.abspath(directory)
-#
-#           if dirname[-1] != os.path.sep:
-#              dirname += os.path.sep
-#
-#           parts = dirname.split(os.path.sep)
-#           archive_dir_base = os.path.sep + os.path.join( *parts[1:-2] )
-#           logging.getLogger().info("archive_dir_base:%s", archive_dir_base)
-#           #Set up the archiving directory if the user is logged in 
-#           #Check if the original path is /data/data1/mx... AN 25/03/2014
-#
-#           if (archive_dir_base.startswith("/data/data1/visitor") or archive_dir_base.startswith("/data/data1/inhouse")):
-#               archive_dir_base = archive_dir_base.replace("/data/data1/visitor/", "/data/ispyb/")
-#
-#
-#           archive_dir = os.path.join( archive_dir_base, "archive")
-#           #archive_dir = os.path.join(archive_dir_base, "archive")
-#           logging.getLogger().info("archive_dir:%s", archive_dir)
-#
-#           if not os.path.exists(archive_dir):
-#               os.makedirs(archive_dir)
-#           return archive_dir
-#        except:
-#           import traceback
-#           traceback.print_exc()
-#           return directory
 
     def get_archive_directory(self, directory):
         res = None
