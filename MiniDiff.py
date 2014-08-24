@@ -37,7 +37,6 @@ def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMmY, pixelsPerMmZ, b
   if all([x.isReady() for x in (phi, phiy, phiz, sampx, sampy)]):
     phiSavedPosition = phi.getPosition()
     phiSavedDialPosition = phi.getDialPosition()
-    logging.info(" Phi saved dial position %s",phiSavedDialPosition)
   else:
     raise RuntimeError, "motors not ready"
 
@@ -65,13 +64,10 @@ def manual_centring(phi, phiy, phiz, sampx, sampy, pixelsPerMmY, pixelsPerMmZ, b
     beam_yc_real = beam_yc / float(pixelsPerMmZ)
     y = yc / float(pixelsPerMmZ)
     x = sum(X) / 3.0 / float(pixelsPerMmY)
-    logging.info("sampx %s, sampy %s, phiy %s, phiz %s", sampx.getPosition(),sampy.getPosition(),phiy.getPosition(),phiz.getPosition())
-    logging.info("y %s, x %s, b1 %s, dx %s, dy %s, beam_xc_real %s, beam_yc_real %s", y,x,b1,dx,dy,beam_xc_real,beam_yc_real)
     centredPos = { sampx: sampx.getPosition() + float(dx),
                    sampy: sampy.getPosition() + float(dy),
                    phiy: phiy.getPosition() + phiy_direction * (x - beam_xc_real),
                    phiz: phiz.getPosition() + (y - beam_yc_real) }
-    logging.info("after centring, sampx %s, sampy %s, phiy %s, phiz %s",sampx.getPosition() + float(dx),sampy.getPosition() + float(dy), phiy.getPosition() + phiy_direction * (x - beam_xc_real), phiz.getPosition() + (y - beam_yc_real))
 
     return centredPos
   except:
@@ -211,7 +207,7 @@ class MiniDiff(Equipment):
 
 
     def init(self):
-        self.phiy_direction = 1
+        self.phiy_direction = -1
         
         self.centringMethods={MiniDiff.MANUAL3CLICK_MODE: self.start3ClickCentring,\
             MiniDiff.C3D_MODE: self.startAutoCentring }
@@ -309,6 +305,11 @@ class MiniDiff(Equipment):
         if self.aperture is not None:
             self.connect(self.aperture, 'predefinedPositionChanged', self.apertureChanged)
             self.connect(self.aperture, 'positionReached', self.apertureChanged)
+
+        try:
+            self.cmdMD2phase = self.getCommandObject("MD2_phase")
+        except KeyError:
+            pass
  
 #         try:
 #           self.auto_loop_centring = self.getChannelObject("auto_centring_flag")
@@ -560,6 +561,9 @@ class MiniDiff(Equipment):
 
 
     def start3ClickCentring(self, sample_info=None):
+        # JN,20140824, check MD2 phase is in sample centring mode
+        self.cmdMD2phase(1)
+
         self.currentCentringProcedure = gevent.spawn(manual_centring, 
                                                      self.phiMotor,
                                                      self.phiyMotor,
