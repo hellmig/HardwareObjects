@@ -115,6 +115,7 @@ class EnergyScan(Equipment):
             logging.getLogger("HWR").error('EnergyScan: error initializing energy-wavelength constant (missing channel)')
 
         self.thEdgeThreshold = self.getProperty("theoritical_edge_threshold")
+ 
         if self.thEdgeThreshold is None:
            self.thEdgeThreshold = 0.01
         
@@ -315,15 +316,12 @@ class EnergyScan(Equipment):
         rawScanFile=os.path.extsep.join((scanFilePrefix, "raw"))
         scanFile=os.path.extsep.join((scanFilePrefix, "efs"))
 
-        logging.getLogger("HWR").info(" - dochooch 1 (rawScanFile=%s)" % (rawScanFile) )
         if not os.path.exists(os.path.dirname(scanArchiveFilePrefix)):
             os.makedirs(os.path.dirname(scanArchiveFilePrefix))
         
-        logging.getLogger("HWR").info(" - dochooch 2")
         try:
             f=open(rawScanFile, "w")
             pyarch_f=open(archiveRawScanFile, "w")
-            logging.getLogger("HWR").info(" - dochooch 3")
         except:
             logging.getLogger("HWR").exception("could not create raw scan files")
             self.storeEnergyScan()
@@ -331,11 +329,9 @@ class EnergyScan(Equipment):
             return
         else:
             scanData = []
-            logging.getLogger("HWR").info(" - dochooch 4")
             
             if scanObject is None:                
                 raw_data_file = os.path.join(os.path.dirname(scanFilePrefix), 'data.raw')
-                logging.getLogger("HWR").info(" - dochooch 4.1 (filename is: %s)" % raw_data_file)
                 try:
                     raw_file = open(raw_data_file, 'r')
                 except:
@@ -343,7 +339,6 @@ class EnergyScan(Equipment):
                     self.emit("energyScanFailed", ())
                     return
                 
-                logging.getLogger("HWR").info(" - dochooch 4.2")
                 for line in raw_file.readlines()[2:]:
                     (x, y) = line.split('\t')
                     x = float(x.strip())
@@ -353,7 +348,6 @@ class EnergyScan(Equipment):
                     f.write("%f,%f\r\n" % (x, y))
                     pyarch_f.write("%f,%f\r\n"% (x, y))
             else:
-                logging.getLogger("HWR").info(" - dochooch 4.3")
                 for i in range(len(scanObject.x)):
                     x = float(scanObject.x[i])
                     x = x < 1000 and x*1000.0 or x 

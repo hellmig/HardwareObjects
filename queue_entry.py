@@ -649,7 +649,7 @@ class DataCollectionQueueEntry(BaseQueueEntry):
             try:
                 if dc.experiment_type is EXPERIMENT_TYPE.HELICAL:
                     acq_1, acq_2 = (dc.acquisitions[0], dc.acquisitions[1])
-                    self.collect_hwobj.getChannelObject("helical").setValue(1)
+#                    self.collect_hwobj.getChannelObject("helical").setValue(1) #JN TMP disable, need to fix SPEC
 
                     start_cpos = acq_1.acquisition_parameters.centred_position
                     end_cpos = acq_2.acquisition_parameters.centred_position
@@ -658,7 +658,8 @@ class DataCollectionQueueEntry(BaseQueueEntry):
                                          store_centred_position(end_cpos)
 
                     helical_oscil_pos = {'1': start_cpos.as_dict(), '2': end_cpos.as_dict()}
-                    self.collect_hwobj.getChannelObject('helical_pos').setValue(helical_oscil_pos)
+                    log.info('Helical_pos value is ' + str(helical_oscil_pos))
+#                    self.collect_hwobj.getChannelObject('helical_pos').setValue(helical_oscil_pos) #JN TMP disable, need to fix SPEC 
 
                     msg = "Helical data collection, moving to start position"
                     log.info(msg)
@@ -954,7 +955,6 @@ class EnergyScanQueueEntry(BaseQueueEntry):
             # No sample id, pass None to startEnergyScan
             if sample_lims_id == -1:
                 sample_lims_id = None
-
             self.energy_scan_task = \
                 gevent.spawn(self.energy_scan_hwobj.startEnergyScan,
                              energy_scan.element_symbol,
@@ -1031,12 +1031,12 @@ class EnergyScanQueueEntry(BaseQueueEntry):
     def energy_scan_finished(self, scan_info):
         energy_scan = self.get_data_model()
         scan_file_path = os.path.join(energy_scan.path_template.directory,
-                                      energy_scan.path_template.get_prefix())
+                                      energy_scan.path_template.get_prefix()+"_"+str(energy_scan.path_template.run_number)+"_"+ '%0*d' % (3, energy_scan.path_template.start_num)) # JN,20140822
 
         logging.info("energy_scan_finished: file_path: %s " % scan_file_path)
         scan_file_archive_path = os.path.join(energy_scan.path_template.\
                                               get_archive_directory(),
-                                              energy_scan.path_template.get_prefix())
+                                              energy_scan.path_template.get_prefix()+"_"+str(energy_scan.path_template.run_number)+"_"+ '%0*d' % (3, energy_scan.path_template.start_num))  # JN,20140822
 
         logging.info("energy_scan_finished: doingChooch ")
         (pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, rm,
@@ -1064,6 +1064,10 @@ class EnergyScanQueueEntry(BaseQueueEntry):
             info("Energy scan, result: peak: %.4f, inflection: %.4f" %
                  (sample.crystals[0].energy_scan_result.peak,
                   sample.crystals[0].energy_scan_result.inflection))
+
+        logging.getLogger("user_level_log").\
+            info("Energy scan, result: pk: %.4f, inf: %.4f" %
+                 (pk,ip))
 
         self.get_view().setText(1, "Done")
 
@@ -1190,7 +1194,8 @@ def mount_sample(beamline_setup_hwobj, view, data_model,
                             " the suggested centring or re-center")
             elif centring_method == CENTRING_METHOD.FULLY_AUTOMATIC:
                 log.info("Centring sample, please wait.")
-                dm.startCentringMethod(dm.C3D_MODE)
+                return    #JN temporary switch off for testing robot, 20140711
+                #dm.startCentringMethod(dm.C3D_MODE) #JN temporary switch off for testing robot, 20140711
 
             view.setText(1, "Centring !")
             async_result.get()
