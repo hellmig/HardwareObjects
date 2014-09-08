@@ -157,8 +157,8 @@ def take_snapshots(light, lightmot, phi, zoom, drawing):
   for i in range(4):
      logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d", i+1)
      centredImages.append((phi.getPosition(),str(myimage(drawing))))
-     logging.getLogger("HWR").info("MiniDiff: moving phi by -90 ")
-     phi.syncMoveRelative(-90)
+     logging.getLogger("HWR").info("MiniDiff: moving phi by 90 ")
+     phi.syncMoveRelative(90) #JN 20140908
      logging.getLogger("HWR").info("MiniDiff: phi finished moving")
 
   if light is not None:
@@ -562,7 +562,7 @@ class MiniDiff(Equipment):
 
     def start3ClickCentring(self, sample_info=None):
         # JN,20140824, check MD2 phase is in sample centring mode
-        self.cmdMD2phase(1)
+       # self.cmdMD2phase(1) # 20140901, disable,due to collision (click centring when exchanging sample)
 
         self.currentCentringProcedure = gevent.spawn(manual_centring, 
                                                      self.phiMotor,
