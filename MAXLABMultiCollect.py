@@ -847,7 +847,9 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           return None
         else:
           if 'inhouse' in directory:
-            archive_dir = os.path.join('/data/ispyb/', dir_path_list[3], suffix_path)
+            #albnar 20/08/2014: Try to have the same behavior of the visitors
+            #archive_dir = os.path.join('/data/ispyb/', dir_path_list[3], suffix_path)
+            archive_dir = os.path.join('/data/ispyb/', dir_path_list[4], *dir_path_list[5:])
           else:
             archive_dir = os.path.join('/data/ispyb/', dir_path_list[4], *dir_path_list[5:])
           if archive_dir[-1] != os.path.sep:
@@ -855,3 +857,18 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
 
           return archive_dir
          
+
+    # JN, 20140904, save snapshot in the RAW_DATA folder in the end of the data collection 
+    def do_collect(self, owner, data_collect_parameters):
+
+        AbstractMultiCollect.do_collect(self, owner, data_collect_parameters)
+
+        file_parameters = data_collect_parameters["fileinfo"] 
+        snapshot_directory = self.get_archive_directory(file_parameters["directory"])
+        snapshot_filename = "%s_%s_*.snapshot.jpeg" % (file_parameters["prefix"],
+                                                                file_parameters["run_number"]) 
+        full_snapshot = os.path.join(snapshot_directory,
+                                             snapshot_filename)
+        os.system("cp %s %s" % (full_snapshot,file_parameters["directory"]))
+        #logging.info("cp %s %s" % (full_snapshot,file_parameters["directory"]))
+
