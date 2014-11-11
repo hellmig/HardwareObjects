@@ -758,21 +758,24 @@ class PathTemplate(object):
         :returns: Archive directory.
         :rtype: str
         """
-        folders = self.directory.split('/')
-        endstation_name = None
-        
-        if 'visitor' in folders:
-            endstation_name = folders[4]
-            folders[2] = PathTemplate.archive_folder
-            temp = folders[3]
-            folders[3] = folders[4]
-            folders[4] = temp
-        else:
-            endstation_name = folders[2]
-            folders[2] = PathTemplate.archive_folder
-            folders[3] = endstation_name
+        archive_directory = ""
+        if len(PathTemplate.archive_base_directory) > 0:
+            # archive base set, i. e. copy data to archive location
+            folders = self.directory.split('/')
+            endstation_name = None
+            
+            if 'visitor' in folders:
+                endstation_name = folders[4]
+                folders[2] = PathTemplate.archive_folder
+                temp = folders[3]
+                folders[3] = folders[4]
+                folders[4] = temp
+            else:
+                endstation_name = folders[2]
+                folders[2] = PathTemplate.archive_folder
+                folders[3] = endstation_name
 
-        archive_directory = os.path.join(os.path.join(PathTemplate.archive_base_directory, *folders[2:]))
+            archive_directory = os.path.join(os.path.join(PathTemplate.archive_base_directory, *folders[2:]))
 
         return archive_directory
 

@@ -1033,9 +1033,12 @@ class EnergyScanQueueEntry(BaseQueueEntry):
         scan_file_path = os.path.join(energy_scan.path_template.directory,
                                       fname)
 
-        scan_file_archive_path = os.path.join(energy_scan.path_template.\
-                                              get_archive_directory(),
-                                              energy_scan.path_template.get_prefix())
+        if len(energy_scan.path_template.get_archive_directory()) > 0:
+            scan_file_archive_path = os.path.join(energy_scan.path_template.\
+                                                  get_archive_directory(),
+                                                  energy_scan.path_template.get_prefix())
+        else:
+            scan_file_archive_path = ""
 
         (pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, rm,
          chooch_graph_x, chooch_graph_y1, chooch_graph_y2, title) = \
