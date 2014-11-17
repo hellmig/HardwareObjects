@@ -19,7 +19,7 @@ logger = logging.getLogger('queue_exec')
 try:
     formatter = \
               logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    hdlr = logging.FileHandler('/users/blissadm/log/queue_exec.log')
+    hdlr = logging.FileHandler('/home/blissadm/log/queue_exec.log')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
 except:
