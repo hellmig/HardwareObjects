@@ -4,24 +4,28 @@ import logging
 import time
 import gevent
 import types
+import emotion
+import os
 
-class RobodiffMotor(Device):      
+class EmotionMotor(Device):      
     (NOTINITIALIZED, UNUSABLE, READY, MOVESTARTED, MOVING, ONLIMIT) = (0,1,2,3,4,5)
+
+    @staticmethod
+    def load_config(config_file):
+        emotion.load_cfg(config_file,clear=False)    
 
     def __init__(self, name):
         Device.__init__(self, name)
 
     def init(self): 
-        self.motorState = RobodiffMotor.NOTINITIALIZED
+        self.motorState = EmotionMotor.NOTINITIALIZED
         self.username = self.motor_name
-        controller = self.getObjectByRole("controller")
 
-        # this is ugly : I added it to make the centring procedure happy
-        self.specName = self.motor_name
-
-        self.motor = getattr(controller, self.motor_name)
+        EmotionMotor.load_config(self.config_file)
+        self.motor = emotion.get_axis(self.motor_name)
         self.connect(self.motor, "position", self.positionChanged)
         self.connect(self.motor, "state", self.updateState)
+        self.connect(self.motor, "move_done", self._move_done)
 
     def connectNotify(self, signal):
         if signal == 'positionChanged':
@@ -30,21 +34,27 @@ class RobodiffMotor(Device):
                 self.updateState()
         elif signal == 'limitsChanged':
                 self.motorLimitsChanged()  
+
+    def _move_done(self, move_done):
+        if move_done:
+          self.updateState("READY")
+        else:
+          self.updateState("MOVING")
  
     def updateState(self, state=None):
         if state is None:
             state = self.motor.state()
         # convert from grob state to Hardware Object motor state
         if state == "MOVING":
-            state = RobodiffMotor.MOVING
+            state = EmotionMotor.MOVING
         elif state == "READY":
-            state = RobodiffMotor.READY
+            state = EmotionMotor.READY
         elif state == "ONLIMIT":
-            state = RobodiffMotor.ONLIMIT
+            state = EmotionMotor.ONLIMIT
         else:
-            state = RobodiffMotor.UNUSABLE
+            state = EmotionMotor.UNUSABLE
 
-        self.setIsReady(state > RobodiffMotor.UNUSABLE)
+        self.setIsReady(state > EmotionMotor.UNUSABLE)
 
         if self.motorState != state:
             self.motorState = state
@@ -71,8 +81,8 @@ class RobodiffMotor(Device):
         return self.getPosition()
 
     def move(self, position):
-        self.updateState("MOVING")
-        self.motor.move(position, wait=False) 
+        #self.updateState("MOVING")
+        self.motor.move(position, wait=False) #.link(self.updateState)
 
     def moveRelative(self, relativePosition):
         self.move(self.getPosition() + relativePosition)
@@ -89,7 +99,7 @@ class RobodiffMotor(Device):
         self.waitEndOfMove(timeout)
 
     def motorIsMoving(self):
-        return self.motorState == RobodiffMotor.MOVING
+        return self.motorState == EmotionMotor.MOVING
  
     def getMotorMnemonic(self):
         return self.motor_name

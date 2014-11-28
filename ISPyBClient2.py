@@ -1151,12 +1151,16 @@ class ISPyBClient2(HardwareObject):
         mpos_dict = {'omega' : cpos.phi,
                      'phi': cpos.kappa_phi,
                      'kappa': cpos.kappa,
-                     'phiX': cpos.phix, 
+                     'phiX': cpos.focus,
                      'phiY': cpos.phiy,
                      'phiZ': cpos.phiz,
                      'sampX': cpos.sampx,
                      'sampY': cpos.sampy}
-
+        try:
+          mpos_dict['chi']=cpos.chi
+        except AttributeError:
+          pass
+          
         msg = 'Storing position in LIMS'
         logging.getLogger("user_level_log").info(msg)
         

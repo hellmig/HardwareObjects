@@ -86,12 +86,13 @@ def ready(*motors):
   return not any([m.motorIsMoving() for m in motors])
 
 def move_motors(motor_positions_dict):
+  #import pdb; pdb.set_trace()
   def wait_ready(timeout=None):
     with gevent.Timeout(timeout):
       while not ready(*motor_positions_dict.keys()):
         time.sleep(0.1)
 
-  wait_ready(timeout=3)
+  wait_ready(timeout=30)
 
   if not ready(*motor_positions_dict.keys()):
     raise RuntimeError("Motors not ready")
@@ -121,7 +122,10 @@ def center(phi, phiy, phiz,
   try:
     i = 0
     while i < n_points:
-      x, y = USER_CLICKED_EVENT.get()
+      try:
+          x, y = USER_CLICKED_EVENT.get()
+      except:
+          raise RuntimeError("Aborted while waiting for point selection")
       USER_CLICKED_EVENT = gevent.event.AsyncResult()
       X.append(x / float(pixelsPerMm_Hor))
       Y.append(y / float(pixelsPerMm_Ver))
@@ -130,6 +134,7 @@ def center(phi, phiy, phiz,
       READY_FOR_NEXT_POINT.set()
       i += 1
   except:
+    logging.exception("Exception while centring")
     move_motors(SAVED_INITIAL_POSITIONS)
     raise
 
@@ -149,6 +154,7 @@ def center(phi, phiy, phiz,
 
   d_horizontal =  d[0] - (beam_xc / float(pixelsPerMm_Hor))
   d_vertical =  d[1] - (beam_yc / float(pixelsPerMm_Ver))
+
 
   phi_pos = math.radians(phi.direction*phi.getPosition())
   phiRotMatrix = numpy.matrix([[math.cos(phi_pos), -math.sin(phi_pos)],
@@ -198,11 +204,11 @@ def start_auto(camera,  centring_motors_dict,
                                     msg_cb, new_point_cb)
     return CURRENT_CENTRING
 
-def find_loop(camera, pixelsPerMm_Hor, msg_cb, new_point_cb):
+def find_loop(camera, pixelsPerMm_Hor, chi_angle, msg_cb, new_point_cb):
   snapshot_filename = os.path.join(tempfile.gettempdir(), "mxcube_sample_snapshot.png")
   camera.takeSnapshot(snapshot_filename, bw=True)
 
-  info, x, y = lucid.find_loop(snapshot_filename, pixels_per_mm_horizontal=pixelsPerMm_Hor, debug=False)
+  info, x, y = lucid.find_loop(snapshot_filename, debug=False,pixels_per_mm_horizontal=pixelsPerMm_Hor, chi_angle=chi_angle)
   
   if callable(msg_cb):
     msg_cb("Loop found: %s (%d, %d)" % (info, x, y))
@@ -224,7 +230,7 @@ def auto_center(camera,
  
     #check if loop is there at the beginning
     i = 0
-    while -1 in find_loop(camera, pixelsPerMm_Hor, msg_cb, new_point_cb):
+    while -1 in find_loop(camera, pixelsPerMm_Hor, chi_angle, msg_cb, new_point_cb):
         phi.syncMoveRelative(90)
         i+=1
         if i>4:
@@ -245,14 +251,14 @@ def auto_center(camera,
                                        n_points)
 
       for a in range(n_points):
-            x, y = find_loop(camera, pixelsPerMm_Hor, msg_cb, new_point_cb) 
+            x, y = find_loop(camera, pixelsPerMm_Hor, chi_angle, msg_cb, new_point_cb) 
             #logging.info("in autocentre, x=%f, y=%f",x,y)
             if x < 0 or y < 0:
               for i in range(1,5):
                 logging.debug("loop not found - moving back")
                 phi.syncMoveRelative(-20)
                 xold, yold = x, y
-                x, y = find_loop(camera, pixelsPerMm_Hor, msg_cb, new_point_cb)
+                x, y = find_loop(camera, pixelsPerMm_Hor, chi_angle, msg_cb, new_point_cb)
                 if x >=0:
                   if y < imgHeight/2:
                     y = 0
