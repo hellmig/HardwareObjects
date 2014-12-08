@@ -467,6 +467,7 @@ class SampleQueueEntry(BaseQueueEntry):
         BaseQueueEntry.post_execute(self)
         params = []
 
+        #JNtodo, disable end_multicollect for dataset less than 1, or energy scan
         # Start grouped processing, get information from each collection
         # and call autoproc with grouped processing option
         for child in self.get_data_model().get_children():
@@ -576,6 +577,7 @@ class DataCollectionQueueEntry(BaseQueueEntry):
         self.shape_history = None
         self.session = None
         self.lims_client_hwobj = None
+        self.startTime = None
 
     def execute(self):
         BaseQueueEntry.execute(self)
@@ -715,6 +717,9 @@ class DataCollectionQueueEntry(BaseQueueEntry):
         pass
 
     def collect_number_of_frames(self, number_of_images=0):
+        #JN,20140912, start timer, used for calculating elapsed time 
+        self.startTime = time.time() 
+        logging.info ("start timer at %s",str(self.startTime))
         pass
 
     def image_taken(self, image_number):
@@ -729,7 +734,18 @@ class DataCollectionQueueEntry(BaseQueueEntry):
         if first_image != 0:
             image_number = image_number - first_image + 1
 
-        self.get_view().setText(1, str(image_number) + "/" + num_images)
+        #JN,20140915, add elapsed time and time remaining
+        time_spent=time.time()-self.startTime
+        time_spent_per_image=time_spent/image_number
+        images_left=self.get_data_model().acquisitions[0].acquisition_parameters.num_images-image_number
+        time_left=time_spent_per_image*images_left
+        time_left3=time.gmtime(time_left)
+        time_spent3=time.gmtime(time_spent)
+        logging.info("time spent %s, time left %s", time.strftime("%H:%M",time_spent3),time.strftime("%H:%M",time_left3))
+
+        #self.get_view().setText(1, str(image_number) + "/" + num_images)
+        #self.get_view().setText(1, str(image_number) + "/" + num_images + "  " +time.strftime("%H:%M:%S",time_spent3) + "/" +time.strftime("%H:%M:%S",time_left3) )
+        self.get_view().setText(1, str(image_number) + "/" + num_images + "  " +time.strftime("%H:%M",time_spent3) + "/" +time.strftime("%H:%M",time_left3) )
 
     def preparing_collect(self, number_images=0):
         self.get_view().setText(1, "Collecting")
