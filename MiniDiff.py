@@ -656,17 +656,31 @@ class MiniDiff(Equipment):
 
     def do_auto_centring(self, phi, phiy, phiz, sampx, sampy, zoom, camera, phiy_direction):
         if not lucid:
+          logging.info("lucid not found")
           return
+         
+       # logging.info("lucid found %s" % (lucid))
 
         imgWidth = camera.getWidth()
         imgHeight = camera.getHeight()
 
         def find_loop(pixels_per_mm_horizontal, show_point=True):
           #img_array = numpy.fromstring(camera.getChannelObject("image").getValue(), numpy.uint8)
-          rgbImgChan    = camera.addChannel({ 'type': 'tango', 'name': 'rgbimage', "read_as_str": 1 }, "RgbImage")
-          raw_data = rgbImgChan.getValue()
-          snapshot_filename = os.path.join(tempfile.gettempdir(), "mxcube_sample_snapshot.png")
-          Image.fromstring("RGB", (imgWidth, imgHeight), raw_data).save(snapshot_filename)
+ 
+          #JN,20141216,ESRF for prosilica camera
+          #rgbImgChan    = camera.addChannel({ 'type': 'tango', 'name': 'rgbimage', "read_as_str": 1 }, "RgbImage")
+          #raw_data = rgbImgChan.getValue()
+          #snapshot_filename = os.path.join(tempfile.gettempdir(), "mxcube_sample_snapshot.png")
+          #Image.fromstring("RGB", (imgWidth, imgHeight), raw_data).save(snapshot_filename)
+
+
+          #JN,20141216,maxlab version for PAL camera
+          raw_data = str(myimage(self._drawing))
+          snapshot_filename = os.path.join(tempfile.gettempdir(), "mxcube_sample_snapshot.jpeg")
+          logging.info("snapshot_filename is %s" % (snapshot_filename))
+          f = open(snapshot_filename,"w")
+          f.write(raw_data)
+          f.close()
 
           info, x, y = lucid.find_loop(snapshot_filename, pixels_per_mm_horizontal=pixels_per_mm_horizontal)
           

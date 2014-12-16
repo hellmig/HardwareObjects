@@ -1199,6 +1199,8 @@ def mount_sample(beamline_setup_hwobj, view, data_model,
             dm.connect("centringAccepted", centring_done_cb)
             centring_method = view.listView().parent().\
                               centring_method
+
+            log.info("Centring method %s", centring_method)
                   
             if centring_method == CENTRING_METHOD.MANUAL:
                 log.warning("Manual centring used, waiting for" +\
@@ -1210,8 +1212,7 @@ def mount_sample(beamline_setup_hwobj, view, data_model,
                             " the suggested centring or re-center")
             elif centring_method == CENTRING_METHOD.FULLY_AUTOMATIC:
                 log.info("Centring sample, please wait.")
-                return    #JN temporary switch off for testing robot, 20140711
-                #dm.startCentringMethod(dm.C3D_MODE) #JN temporary switch off for testing robot, 20140711
+                dm.startCentringMethod(dm.C3D_MODE) #JN temporary switch off for testing robot, 20140711
 
             view.setText(1, "Centring !")
             async_result.get()
