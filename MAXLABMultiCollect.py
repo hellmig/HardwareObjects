@@ -287,8 +287,10 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
 
     @task
     def set_transmission(self, transmission_percent):
+        #return
+        #JN,20150119 enable pseudo transmission
+        self.bl_control.transmission.setTransmission(transmission_percent)
         return
-        # self.bl_control.transmission.setTransmission(transmission_percent)
 
 
     def set_wavelength(self, wavelength):
@@ -437,12 +439,13 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
           self.create_directories(dir)
           logging.info("Creating MOSFLM processing input file directory: %s", dir)
           os.chmod(dir, 0777)
-         
-        raw_hkl2000_dir = os.path.join(files_directory, "process", "hkl2000")
-        hkl2000_dir = os.path.join(process_directory, "hkl2000")
-        for dir in (raw_hkl2000_dir, hkl2000_dir):
-          self.create_directories(dir)
-          os.chmod(dir, 0777)
+        
+        #JN, 20140912, remove hkl2000 folder 
+        #raw_hkl2000_dir = os.path.join(files_directory, "process", "hkl2000")
+        #hkl2000_dir = os.path.join(process_directory, "hkl2000")
+        #for dir in (raw_hkl2000_dir, hkl2000_dir):
+        #  self.create_directories(dir)
+        #  os.chmod(dir, 0777)
  
         try: 
           try: 
@@ -751,7 +754,9 @@ class MAXLABMultiCollect(AbstractMultiCollect, HardwareObject):
 
 
     def get_beam_centre(self):
-      return (self.execute_command("get_beam_centre_x"), self.execute_command("get_beam_centre_y"))
+ #JN,20140911, swap the beam centre X Y value, otherwise it is wrong in LIMS
+#      return (self.execute_command("get_beam_centre_x"), self.execute_command("get_beam_centre_y"))
+       return (self.execute_command("get_beam_centre_y"), self.execute_command("get_beam_centre_x"))
 
     
     def getBeamlineConfiguration(self, *args):
