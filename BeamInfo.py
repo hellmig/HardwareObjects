@@ -43,6 +43,8 @@ class BeamInfo(Equipment):
         self.beam_position = None
         self.beam_info_dict = None
         self.default_beam_divergence = None
+        self.chan_beam_size_microns = None
+        self.chan_beam_shape_ellipse = None
 
 
     def init(self):

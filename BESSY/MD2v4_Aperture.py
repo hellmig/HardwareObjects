@@ -12,16 +12,19 @@ class MD2v4_Aperture(MD2v4_Motor.MD2v4_Motor):
         self.predefinedPositions = {}
         self.tangoname = self.getProperty("tangoname")
         self.labels = self.getChannelObject("diameter_attr")
-        self.filters = self.labels.getValue()
+        self.filters = self.labels.getValue().split()
         self.nb = len(self.filters)
         j = 0
         while j < self.nb :
-          for i in self.filters: #.split() :
+          for i in self.filters: 
             if int(i) >= 300:
               i = "Outbeam"
             self.predefinedPositions[i] = j
             j = j+1
         self.sortPredefinedPositionsList()
+
+        self.current_diameter = self.getChannelObject("current_diameter")
+        self.current_diameter.connectSignal("update",self.currentDiameterChanged)
         
     def sortPredefinedPositionsList(self):
         self.predefinedPositionsNamesList = self.predefinedPositions.keys()
@@ -79,3 +82,12 @@ class MD2v4_Aperture(MD2v4_Motor.MD2v4_Motor):
                 aperture_coef = diameter.getProperty("aperture_coef")
                 return float(aperture_coef)
         return 1
+
+    def currentDiameterChanged(self,value):
+        logging.getLogger().info("aperture motor. current diameter changed. new value is %s" % str(value))
+        try:
+            self.aperture_diameter = int(value)/1000.0
+            self.emit('apertureChanged', ([self.aperture_diameter, self.aperture_diameter]))
+        except:
+            pass
+

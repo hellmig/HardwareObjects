@@ -51,8 +51,23 @@ class BESSY141MultiCollect(BESSYMultiCollect):
     def get_detector_distance(self):
         return self.bl_control.detector_distance.getPosition()
 
+    # New abstract methods in version 2.1
     def set_detector_mode(self):
         pass
+
+    def generate_image_jpeg(self,filename,jpeg_path,jpeg_thumbnail_path):
+        pass 
+
+    def last_image_saved(self):
+        pass
+
+    def set_helical(self,helical_on):
+        pass
+
+    def set_helical_pos(self,helical_pos):
+        pass
+
+    # end new abstract methods
 
     @task
     def set_resolution(self, new_resolution):

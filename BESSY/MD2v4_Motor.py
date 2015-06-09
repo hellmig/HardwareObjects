@@ -25,7 +25,7 @@ class MD2v4_Motor(Device):
         self.offset = self.getProperty("offset")
         self.position_attr = self.getChannelObject("motor_attr")
         self.position_attr.connectSignal("update", self.motorPositionChanged)
-        self.state_attr = self.getChannelObject("motor_state")
+        #self.state_attr = self.getChannelObject("motor_state")
         #self.state_attr.connectSignal("update", self.globalStateChanged)
         self.motors_state_attr = self.getChannelObject("motor_states")
         self.motors_state_attr.connectSignal("update", self.updateMotorState)
