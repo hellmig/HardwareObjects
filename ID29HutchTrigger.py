@@ -6,7 +6,7 @@ import time
 import sys
 
 
-class ID30HutchTrigger(BaseHardwareObjects.HardwareObject):
+class ID29HutchTrigger(BaseHardwareObjects.HardwareObject):
     def __init__(self, name):
         BaseHardwareObjects.HardwareObject.__init__(self, name)
 
@@ -25,9 +25,6 @@ class ID30HutchTrigger(BaseHardwareObjects.HardwareObject):
             last_error = traceback[-1]
             logging.getLogger('HWR').error("%s: %s", str(self.name()), last_error['desc'])
             self.device = None
-            self.device.imported = False
-        else:
-            self.device.imported = True
 
         self.pollingTask=None
         self.initialized = False
@@ -44,7 +41,6 @@ class ID30HutchTrigger(BaseHardwareObjects.HardwareObject):
 
         if self.device is not None:
             self.pollingTask = gevent.spawn(self._do_polling)
-           
         self.connected()
  
 
@@ -63,32 +59,21 @@ class ID30HutchTrigger(BaseHardwareObjects.HardwareObject):
     def abort(self):
         pass
         
-  
-    def macro(self, entering_hutch, old={"dtox":None, "aperture":None}):
+    
+    def macro(self, entering_hutch, old={"dtox":None}):
         logging.info("%s: %s hutch", self.name(), "entering" if entering_hutch else "leaving")
-        eh_controller = self.getObjectByRole("eh_controller")
+        dtox = self.getObjectByRole("detector_distance")
         if not entering_hutch:
-          detcover_task = eh_controller.detcover.set_out(wait=False)
           if old["dtox"] is not None:
-            eh_controller.DtoX.move(old["dtox"], wait=False)
-          if self.getObjectByRole("aperture") and old["aperture"] is not None:
-            self.getObjectByRole("aperture").moveToPosition(old["aperture"])
-          self.getObjectByRole("beamstop").moveToPosition("in")
-          detcover_task.get()
-          eh_controller.DtoX.wait_move()
+            dtox.move(old["dtox"])
+          self.getCommandObject("macro")(0)
         else: 
-          old["dtox"] = eh_controller.DtoX.position()
-          if self.getObjectByRole("aperture"): 
-              old["aperture"] = self.getObjectByRole("aperture").getPosition()
-          detcover_task = eh_controller.detcover.set_in(wait=False)
-          eh_controller.DtoX.move(700, wait=False)
-          if self.getObjectByRole("aperture"):
-              self.getObjectByRole("aperture").moveToPosition("Outbeam")
-          self.getObjectByRole("beamstop").moveToPosition("out")
-          detcover_task.get()
-          eh_controller.DtoX.wait_move()
+          old["dtox"] = dtox.getPosition()
+          self.getCommandObject("macro")(1)
+          dtox.move(700)
+        dtox.waitEndOfMove()
 
- 
+    
     def poll(self):
         a=self.device.GetInterlockState([self.card-1, 2*(self.channel-1)])[0]
         b=self.device.GetInterlockState([self.card-1, 2*(self.channel-1)+1])[0]
