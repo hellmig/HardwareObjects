@@ -3,7 +3,6 @@ from gevent.event import AsyncResult
 from Qub.Tools import QubImageSave
 from HardwareRepository.BaseHardwareObjects import Equipment
 from HardwareRepository.TaskUtils import *
-import Image
 import tempfile
 import logging
 import math
@@ -13,6 +12,7 @@ from HardwareRepository import HardwareRepository
 import copy
 import sample_centring
 import numpy
+import queue_model_objects_v1 as qmo
 
 class myimage:
     def __init__(self, drawing):
@@ -44,31 +44,38 @@ class myimage:
         return self.imgcopy
 
 
+def set_light_in(light, light_motor, zoom):
+    with gevent.Timeout(5, RuntimeError("Could not set light in")):
+       light_level = None
+
+       if light is not None:
+           light.wagoIn()
+
+       # No light level, choose default
+       if light_motor.getPosition() == 0:
+           zoom_level = int(zoom.getPosition())
+           light_level = None
+
+           try:
+               light_level = zoom['positions'][0][zoom_level].getProperty('lightLevel')
+           except IndexError:
+               logging.getLogger("HWR").info("Could not get default light level")
+               light_level = 1
+
+       if light_level:
+           light_motor.move(light_level)
+
+       while light.getWagoState()!="in":
+           time.sleep(0.5)
+
+
 def take_snapshots(number_of_snapshots, light, light_motor, phi, zoom, drawing):
   if number_of_snapshots <= 0:
     return
 
   centredImages = []
 
-  if light is not None:
-    light.wagoIn()
-
-    # No light level, choose default
-    if light_motor.getPosition() == 0:
-      zoom_level = zoom.getPosition()
-      light_level = None
-
-      try:
-        light_level = zoom['positions'][0][zoom_level].getProperty('lightLevel')
-      except IndexError:
-        logging.getLogger("HWR").info("Could not get default light level")
-        light_level = 1
-
-      if light_level:
-        light_motor.move(light_level)
-
-    while light.getWagoState()!="in":
-      time.sleep(0.5)
+  set_light_in(light, light_motor, zoom)
 
   for i, angle in enumerate([-90]*number_of_snapshots):
      logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d", i+1)
@@ -88,6 +95,16 @@ class MiniDiff(Equipment):
     def __init__(self, *args):
         Equipment.__init__(self, *args)
 
+        qmo.CentredPosition.set_diffractometer_motor_names("phi",
+                                                           "focus",
+                                                           "phiz",
+                                                           "phiy",
+                                                           "zoom",
+                                                           "sampx",
+                                                           "sampy",
+                                                           "kappa",
+                                                           "kappa_phi")
+
         self.phiMotor = None
         self.phizMotor = None
         self.phiyMotor = None
@@ -100,6 +117,7 @@ class MiniDiff(Equipment):
         self.lightWago = None
         self.currentSampleInfo = None
         self.aperture = None
+        self.beam_info = None
       
         self.pixelsPerMmY=None
         self.pixelsPerMmZ=None
@@ -107,6 +125,7 @@ class MiniDiff(Equipment):
         self.imgHeight = None
         self.centredTime = 0
         self.user_confirms_centring = True
+        self.do_centring = True
 
         self.connect(self, 'equipmentReady', self.equipmentReady)
         self.connect(self, 'equipmentNotReady', self.equipmentNotReady)     
@@ -129,7 +148,7 @@ class MiniDiff(Equipment):
         
         self.phiMotor = self.getDeviceByRole('phi')
         self.phizMotor = self.getDeviceByRole('phiz')
-        self.phiyMotor = self.getDeviceByRole("phiy")
+        self.phiyMotor = self.getObjectByRole("phiy")
         self.zoomMotor = self.getDeviceByRole('zoom')
         self.lightMotor = self.getDeviceByRole('light')
         self.focusMotor = self.getDeviceByRole('focus')
@@ -138,28 +157,34 @@ class MiniDiff(Equipment):
         self.camera = self.getDeviceByRole('camera')
         self.kappaMotor = self.getDeviceByRole('kappa')
         self.kappaPhiMotor = self.getDeviceByRole('kappa_phi')
+        self.beam_info = self.getObjectByRole('beam_info')
+
+        # mh 2013-11-05:why is the channel read directly? disabled for the moment
+        # self.camera.addChannel({ 'type': 'tango', 'name': 'jpegImage' }, "JpegImage")
+
         self.centringPhi=sample_centring.CentringMotor(self.phiMotor, direction=-1)
         self.centringPhiz=sample_centring.CentringMotor(self.phizMotor, reference_position=phiz_ref)
         self.centringPhiy=sample_centring.CentringMotor(self.phiyMotor)
         self.centringSamplex=sample_centring.CentringMotor(self.sampleXMotor)
         self.centringSampley=sample_centring.CentringMotor(self.sampleYMotor)
 
+        hwr = HardwareRepository.HardwareRepository()
         sc_prop=self.getProperty("samplechanger")
         if sc_prop is not None:
             try:
-                self.sampleChanger=HardwareRepository.HardwareRepository().getHardwareObject(sc_prop)
+                self.sampleChanger=hwr.getHardwareObject(sc_prop)
             except:
                 pass
         wl_prop=self.getProperty("wagolight")
         if wl_prop is not None:
             try:
-                self.lightWago=HardwareRepository.HardwareRepository().getHardwareObject(wl_prop)
+                self.lightWago=hwr.getHardwareObject(wl_prop)
             except:
                 pass
         aperture_prop = self.getProperty("aperture")
         if aperture_prop is not None:
             try:
-                self.aperture = HardwareRepository.HardwareRepository().getHardwareObject(aperture_prop)
+                self.aperture = hwr.getHardwareObject(aperture_prop)
             except:
                 pass
             
@@ -218,6 +243,7 @@ class MiniDiff(Equipment):
 
 
     def save_snapshot(self, filename):
+        set_light_in(self.lightWago, self.lightMotor, self.zoomMotor)
         img = myimage(self._drawing)
         img.save(filename)
 
@@ -277,13 +303,23 @@ class MiniDiff(Equipment):
         if self.zoomMotor is not None:
             if self.zoomMotor.hasObject('positions'):
                 for position in self.zoomMotor['positions']:
-                    if position.offset == offset:
+                    if abs(position.offset - offset)<=self.zoomMotor.delta:
                         calibrationData = position['calibrationData']
                         return (float(calibrationData.pixelsPerMmY) or 0, float(calibrationData.pixelsPerMmZ) or 0)
         return (None, None)
 
+    def get_pixels_per_mm(self):
+	return (self.pixelsPerMmY, self.pixelsPerMmZ)
+
+    def getBeamInfo(self, callback=None):
+	beam_info = self.beam_info.get_beam_info() 
+	if callable(callback):
+          callback(beam_info)
+        return beam_info
 
     def zoomMotorPredefinedPositionChanged(self, positionName, offset):
+        if not positionName:
+            return 
         self.pixelsPerMmY, self.pixelsPerMmZ = self.getCalibrationData(offset)
         self.emit('zoomMotorPredefinedPositionChanged', (positionName, offset, ))
 
@@ -339,16 +375,12 @@ class MiniDiff(Equipment):
     def getBeamPosY(self):
         return self.imgHeight / 2
 
-    def getBeamInfo(self, update_beam_callback):
-        get_beam_info = self.getCommandObject("getBeamInfo")
-        get_beam_info(callback=update_beam_callback, error_callback=None, wait=True)
-
     def moveToBeam(self, x, y):
         try:
             beam_xc = self.getBeamPosX()
             beam_yc = self.getBeamPosY()
-            self.phizMotor.moveRelative((y-beam_yc)/float(self.pixelsPerMmZ))
-            self.phiyMotor.moveRelative((x-beam_xc)/float(self.pixelsPerMmY))
+            self.centringPhiz.moveRelative((y-beam_yc)/float(self.pixelsPerMmZ))
+            self.centringPhiy.moveRelative((x-beam_xc)/float(self.pixelsPerMmY))
         except:
             logging.getLogger("HWR").exception("MiniDiff: could not center to beam, aborting")
 
@@ -358,6 +390,14 @@ class MiniDiff(Equipment):
 
 
     def startCentringMethod(self,method,sample_info=None):
+        if not self.do_centring:
+            self.emitCentringStarted(method)
+            def fake_centring_procedure():
+              return { "motors": {}, "method":method, "valid":True }
+            self.currentCentringProcedure = gevent.spawn(fake_centring_procedure)
+            self.emitCentringSuccessful()
+            return
+
         if self.currentCentringMethod is not None:
             logging.getLogger("HWR").error("MiniDiff: already in centring method %s" % self.currentCentringMethod)
             return
@@ -427,11 +467,11 @@ class MiniDiff(Equipment):
   
     def motor_positions_to_screen(self, centred_positions_dict):
         self.pixelsPerMmY, self.pixelsPerMmZ = self.getCalibrationData(self.zoomMotor.getPosition())
-        phi_angle = math.radians(self.centringPhi.direction*self.phiMotor.getPosition()) 
-        sampx = self.centringSamplex.direction * (centred_positions_dict["sampx"]-self.sampleXMotor.getPosition())
-        sampy = self.centringSampley.direction * (centred_positions_dict["sampy"]-self.sampleYMotor.getPosition())
-        phiy = self.centringPhiy.direction * (centred_positions_dict["phiy"]-self.phiyMotor.getPosition())
-        phiz = self.centringPhiz.direction * (centred_positions_dict["phiz"]-self.phizMotor.getPosition())
+        phi_angle = math.radians(self.centringPhi.direction*self.centringPhi.getPosition()) 
+        sampx = self.centringSamplex.direction * (centred_positions_dict["sampx"]-self.centringSamplex.getPosition())
+        sampy = self.centringSampley.direction * (centred_positions_dict["sampy"]-self.centringSampley.getPosition())
+        phiy = self.centringPhiy.direction * (centred_positions_dict["phiy"]-self.centringPhiy.getPosition())
+        phiz = self.centringPhiz.direction * (centred_positions_dict["phiz"]-self.centringPhiz.getPosition())
         rotMatrix = numpy.matrix([math.cos(phi_angle), -math.sin(phi_angle), math.sin(phi_angle), math.cos(phi_angle)])
         rotMatrix.shape = (2, 2)
         invRotMatrix = numpy.array(rotMatrix.I)
@@ -475,10 +515,10 @@ class MiniDiff(Equipment):
         if isinstance(res, gevent.GreenletExit):
           logging.error("Could not complete automatic centring")
           self.emitCentringFailed()
-        else:
+        else: 
           positions = self.zoomMotor.getPredefinedPositionsList()
           i = len(positions) / 2
-          self.zoomMotor.moveToPosition(positions[i-1])
+          #self.zoomMotor.moveToPosition(positions[i-1])
 
           #be sure zoom stop moving
           while self.zoomMotor.motorIsMoving():
@@ -510,12 +550,7 @@ class MiniDiff(Equipment):
        
     @task 
     def moveToCentredPosition(self, centred_position):
-      motor_position_dict = { self.sampleXMotor: centred_position.sampx,
-                              self.sampleYMotor: centred_position.sampy,
-                              self.phiMotor: centred_position.phi,
-                              self.phiyMotor: centred_position.phiy,
-                              self.phizMotor: centred_position.phiz }
-      return sample_centring.move_motors(motor_position_dict)
+      return self.moveMotors(centred_position.as_dict())
 
     def imageClicked(self, x, y, xi, yi):
         sample_centring.user_click(x,y)
@@ -550,7 +585,6 @@ class MiniDiff(Equipment):
         if self.currentCentringProcedure is not None:
             curr_time=time.strftime("%Y-%m-%d %H:%M:%S")
             self.centringStatus["endTime"]=curr_time
-
             self.centringStatus["motors"]=self.getPositions()
             centred_pos = self.currentCentringProcedure.get()
             for role in self.centringStatus["motors"].iterkeys():
@@ -559,6 +593,7 @@ class MiniDiff(Equipment):
                 self.centringStatus["motors"][role] = centred_pos[motor]
               except KeyError:
 		continue
+
             self.centringStatus["method"]=self.currentCentringMethod
             self.centringStatus["valid"]=True
             
@@ -580,15 +615,15 @@ class MiniDiff(Equipment):
 
 
     def getPositions(self):
-      return { "phi": self.phiMotor.getPosition(),
-               "focus": self.focusMotor.getPosition(),
-               "phiy": self.phiyMotor.getPosition(),
-               "phiz": self.phizMotor.getPosition(),
-               "sampx": self.sampleXMotor.getPosition(),
-               "sampy": self.sampleYMotor.getPosition(),
-               "kappa": self.kappaMotor.getPosition(),
-               "kappa_phi": self.kappaPhiMotor.getPosition(),
-               "zoom": self.zoomMotor.getPosition()}
+      return { "phi": float(self.phiMotor.getPosition()),
+               "focus": float(self.focusMotor.getPosition()),
+               "phiy": float(self.phiyMotor.getPosition()),
+               "phiz": float(self.phizMotor.getPosition()),
+               "sampx": float(self.sampleXMotor.getPosition()),
+               "sampy": float(self.sampleYMotor.getPosition()),
+               "kappa": float(self.kappaMotor.getPosition()) if self.kappaMotor else None,
+               "kappa_phi": float(self.kappaPhiMotor.getPosition()) if self.kappaPhiMotor else None,    
+               "zoom": float(self.zoomMotor.getPosition())}
     
 
     def moveMotors(self, roles_positions_dict):
@@ -603,14 +638,16 @@ class MiniDiff(Equipment):
                   "zoom": self.zoomMotor }
    
         for role, pos in roles_positions_dict.iteritems():
-           motor[role].move(pos)
+           m = motor.get(role)
+           if not None in (m, pos):
+             m.move(pos)
  
         # TODO: remove this sleep, the motors states should
         # be MOVING since the beginning (or READY if move is
         # already finished) 
         time.sleep(1)
  
-        while not all([m.getState() == m.READY for m in motor.itervalues()]):
+        while not all([m.getState() == m.READY for m in motor.itervalues() if m is not None]):
            time.sleep(0.1)
 
 
