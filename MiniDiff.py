@@ -317,7 +317,9 @@ class MiniDiff(Equipment):
           callback(beam_info)
         return beam_info
 
-    def zoomMotorPredefinedPositionChanged(self, positionName, offset):
+    def zoomMotorPredefinedPositionChanged(self, positionName=None, offset=None):
+        self.zoom_posname = positionName
+        self.zoom_offset = offset
         if not positionName:
             return 
         self.pixelsPerMmY, self.pixelsPerMmZ = self.getCalibrationData(offset)
@@ -347,27 +349,26 @@ class MiniDiff(Equipment):
 
 
     def phizMotorMoved(self, pos):
-        if time.time() - self.centredTime > 1.0:
+        if time.time() - self.centredTime > 0.01:
           self.invalidateCentring()
 
     def phiyMotorMoved(self, pos):
-        if time.time() - self.centredTime > 1.0:
-           self.invalidateCentring()
+        if time.time() - self.centredTime > 0.01:
+            self.invalidateCentring()
 
 
     def sampleXMotorMoved(self, pos):
-        if time.time() - self.centredTime > 1.0:
-           self.invalidateCentring()
+        if time.time() - self.centredTime > 0.01:
+            self.invalidateCentring()
 
 
     def sampleYMotorMoved(self, pos):
-        if time.time() - self.centredTime > 1.0:
-           self.invalidateCentring()
+            self.invalidateCentring()
 
 
     def sampleChangerSampleIsLoaded(self, state):
-        if time.time() - self.centredTime > 1.0:
-           self.invalidateCentring()
+        if time.time() - self.centredTime > 0.01:
+            self.invalidateCentring()
 
     def getBeamPosX(self):
         return self.imgWidth / 2
@@ -503,6 +504,7 @@ class MiniDiff(Equipment):
           
           #logging.info("EMITTING CENTRING SUCCESSFUL")
           self.centredTime = time.time()
+          logging.info("saving time of centring")
           self.emitCentringSuccessful()
           self.emitProgressMessage("")
 

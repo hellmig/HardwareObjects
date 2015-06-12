@@ -52,14 +52,15 @@ class BESSY141MultiCollect(BESSYMultiCollect):
         return self.bl_control.detector_distance.getPosition()
 
     # New abstract methods in version 2.1
-    def set_detector_mode(self):
+    def set_detector_mode(self,mode):
         pass
 
     def generate_image_jpeg(self,filename,jpeg_path,jpeg_thumbnail_path):
         pass 
 
     def last_image_saved(self):
-        pass
+        if self._last_image_chan is not None:
+            return self._last_image_chan.getValue()+1
 
     def set_helical(self,helical_on):
         pass

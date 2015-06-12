@@ -88,6 +88,15 @@ class HutchTriggerEpics(Device):
         self.emit('statusChanged', (channelValue, ))
 
 
+    def hutchIsOpened(self):
+        status=self.doorStatus.getValue()
+
+        logging.info("HutchTriggerEpics: hutchIsOpen returns %s" % status)
+        if status=="locked":
+             return False
+        else:
+             return True
+
     def doorStatusChanged(self, value = None):
         # print "HutchTriggerEpics.doorStatusChanged: new status value = %s" % value
 

@@ -91,6 +91,11 @@ def move_motors(motor_positions_dict):
     with gevent.Timeout(timeout):
       while not ready(*motor_positions_dict.keys()):
         time.sleep(0.1)
+        
+  def wait_moving(timeout=None):
+      with gevent.Timeout(timeout):
+          while ready(*motor_positions_dict.keys()):
+              time.sleep(0.1)
 
   wait_ready(timeout=30)
 
@@ -99,9 +104,15 @@ def move_motors(motor_positions_dict):
 
   for motor, position in motor_positions_dict.iteritems():
     motor.move(position)
+
+  try:
+     wait_moving(timeout=0.1) # waits first that at least the movement has started. 
+                   # To cope with MD2 delay in state reporting
+  except gevent.timeout.Timeout:
+     pass
   
   wait_ready()
-  
+
 def user_click(x,y, wait=False):
   READY_FOR_NEXT_POINT.clear()
   USER_CLICKED_EVENT.set((x,y))
@@ -181,6 +192,7 @@ def end(centred_pos=None):
   except:
     move_motors(SAVED_INITIAL_POSITIONS)
     raise
+  logging.info("centring ended")
 
 def start_auto(camera,  centring_motors_dict,
                pixelsPerMm_Hor, pixelsPerMm_Ver, 

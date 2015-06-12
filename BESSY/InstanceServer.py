@@ -10,6 +10,10 @@ import gevent.server
 import socket
 import pwd
 import qt
+from gevent.monkey import patch_socket
+from TaskUtils import task
+patch_socket()
+
 """
 <procedure class="InstanceServer">
   <host>myhostname</host>
@@ -21,6 +25,69 @@ TERMINATOR = "\0"
 INSTANCE_HO = None
 SERVER_CLIENTS = {}
 CLIENTS = {}
+MAGIC = "mxcube"
+
+def start_announcement(discoveryPort, port):
+    def do_start_announcement(port_str, s):
+        while True:
+            s.sendto(port_str, ('<broadcast>', discoveryPort))
+            time.sleep(1)
+    s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    s.bind(('', 0))
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    
+    gevent.spawn(do_start_announcement, MAGIC+str(port), s)
+
+
+###
+### Tools for finding whether we are using an ssh local connection
+###
+import subprocess
+import re
+import os
+
+class OneConnection(object):
+    def __init__(self,user,tty,host):
+        self.user = user
+        self.tty = tty
+        self.host = host
+
+def who():
+
+    p = subprocess.Popen(["who"], stdout=subprocess.PIPE)
+    out, err = p.communicate()
+
+    wholist = []
+    for line in out.split('\n'):
+        parts = re.split("\s+",line)
+
+        if len(parts) < 3:
+            continue
+        host = parts[-1]
+
+        if host.startswith("("):
+            host = host[1:-1]
+        if host == ":0":
+            host = "localhost"
+        wholist.append( OneConnection(parts[0], parts[1],host) )
+
+    return wholist 
+
+def mytty():
+    p = subprocess.Popen(["tty"], stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    return out.strip()[len('/dev')+1:]
+
+def ssh_remote_host():
+    connections =  who()
+    tty = mytty()
+    for conn in connections:
+        if conn.user != os.environ['USER']:
+             continue
+        if conn.tty == tty:
+             return conn.host
+    else:
+        return "unknown"
 
 ###
 ### Creates an asynchronous TCP server to manage multiple application instances
@@ -29,7 +96,8 @@ class InstanceServer(Procedure):
     # Initializes the hardware object
     def init(self):
         # Read the HO configuration
-        self.serverPort=self.getProperty('port')
+        self.discoveryPort=self.getProperty('port')
+        self.serverPort = 0
         self.serverHost=self.getProperty('host')
         if self.serverHost is None:
             self.serverHost=socket.getfqdn("")
@@ -54,12 +122,14 @@ class InstanceServer(Procedure):
         INSTANCE_HO = self
 
         # Check the HO configuration
-        if self.serverPort is None:
+        if self.discoveryPort is None:
             logging.getLogger("HWR").error('InstanceServer: you must specify a port number')
         else:
             pass
 
-        self.already_tried_to_start_server = True
+        # load list of authorized ssh hosts
+        #  only one for know
+        self.privileged_host = self.getProperty("privileged_host") 
 
     def initializeInstance(self):
         # Remove BlissFramework application lockfile
@@ -70,12 +140,19 @@ class InstanceServer(Procedure):
         except:
             pass
         self.emit('instanceInitializing', ())
+        self.startConnection(wait=False)
+
+
+    @task
+    def startConnection(self):
         if self.isLocal():
+            logging.info("Instance server is local. starting server")
             self.startServer()
         else:
-            self.connectToServer()
+            logging.info("Instance server is NOT local. connecting to server")
+            if self.findServer():
+                self.connectToServer()
 
-    # 
     def setProposal(self,proposal):
         if self.isServer():
             my_id=self.serverId2[0]
@@ -122,7 +199,7 @@ class InstanceServer(Procedure):
             if my_nick!=nick:
                 if use_proposal:
                     if prop is not None:
-                        pretty_print="[%s%d]%s" % (prop["code"],prop["number"],nick)
+                        pretty_print="[%s%s]%s" % (prop["code"],prop["number"],nick)
                     else:
                         pretty_print="[?]%s" % nick
                 else:
@@ -132,20 +209,36 @@ class InstanceServer(Procedure):
 
         return pretty_print
 
+    def findServer(self):
+        # discover server port using UDP broadcast
+        s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        s.bind(('',self.discoveryPort))
+
+        with gevent.Timeout(3,False):
+            data, addr = s.recvfrom(1024)
+            if data.startswith(MAGIC):
+               self.serverPort = int(data[len(MAGIC):]) 
+               return True
+
+        if not self.serverPort:
+            logging.getLogger("HWR").error("InstanceServer: cannot connect to MXCuBE master")
+            if not self.isLocal():
+                self.emit("unauthorizedConnection")
+            return False
+
     # Starts the server
     def startServer(self):
         if self.asyncServer is not None:
             logging.getLogger("HWR").error('InstanceServer: server already started')
         elif self.serverPort is not None:
-            try:
-                async_server=gevent.server.StreamServer((self.serverHost, self.serverPort), handleRemoteClient) #AsyncServer(self,self.serverHost,self.serverPort)
-                async_server.start() 
-                self.already_tried_to_start_server = True
-            except:
-                logging.getLogger("HWR").warning('InstanceServer: cannot create server, so trying to connect to it')
-                self.connectToServer()
-            else:
-                self.asyncServer=async_server
+            self.findServer()
+
+            if self.serverPort == 0:
+                self.asyncServer = gevent.server.StreamServer((self.serverHost, self.serverPort), handleRemoteClient) #AsyncServer(self,self.serverHost,self.serverPort)
+                self.asyncServer.start() 
+
+                start_announcement(self.discoveryPort, self.asyncServer.socket.getsockname()[1])
+                         
                 server_hostname=self.serverHost.split('.')[0]
                 logging.getLogger("HWR").debug('InstanceServer: listening to connections on %s:%d' % (server_hostname,self.serverPort))
 
@@ -153,8 +246,11 @@ class InstanceServer(Procedure):
                 self.controlId2=list(self.serverId2)
 
                 self.idCount[server_hostname]=1
-            
+
                 self.emit('serverInitialized', (True,self.serverId2))
+            else:
+                logging.getLogger("HWR").info('InstanceServer: trying to connect to master remote instance (port %d)' % self.serverPort)
+                self.connectToServer()
         else:
             logging.getLogger("HWR").error('InstanceServer: not property configured to start the server')
             self.emit('serverInitialized', (False,))
@@ -167,10 +263,6 @@ class InstanceServer(Procedure):
     def connectToServer(self,quiet=False):
         self.emit('clientInitialized', (None,))
         self.reconnect(quiet)
-        if self.instanceClient is None and not self.already_tried_to_start_server:
-            # we haven't found the InstanceServer, so we are probably the first client although started via SSH
-            # try to start the server
-            self.startServer()
 
     # Connects to the server
     def reconnect(self,quiet=False):
@@ -179,7 +271,7 @@ class InstanceServer(Procedure):
         except:
             self.instanceClient = None
             if not quiet:
-              logging.getLogger("HWR").error('InstanceServer: cannot connect to server')
+              logging.getLogger("HWR").exception('InstanceServer: cannot connect to server')
             self.emit('clientInitialized', (False,(None,None),None,quiet))
         else:
             my_login=pwd.getpwuid(os.getuid())[0]
@@ -192,10 +284,21 @@ class InstanceServer(Procedure):
             send_data_to_server(self.instanceClient, data)
 
     def isLocal(self):    
+        # find 
+        connected_from = ssh_remote_host() 
+        if connected_from == self.privileged_host or connected_from == 'localhost':
+            logging.info("InstanceServer. Connected from: %s / Local: True" % connected_from)
+            return True 
+        else:
+            logging.info("InstanceServer. Connected from: %s / Local: False" % connected_from)
+            return False
+        
+    def oldIsLocal(self):    
         try:
             display=os.environ["DISPLAY"].split(":")[0]
         except:
             return False
+
         if not display:
             return True
         return socket.getfqdn(display)==self.serverHost

@@ -213,6 +213,9 @@ class Cats90(SampleChanger):
             for basket in self.getComponents():
                 self._doScan(basket, True)
     
+    def isDeviceEnabled(self):
+        return self._chnPowered.getValue()
+
     def _doLoad(self,sample=None):
         """
         Loads a sample on the diffractometer. Performs a simple put operation if the diffractometer is empty, and 
@@ -221,8 +224,10 @@ class Cats90(SampleChanger):
         :returns: None
         :rtype: None
         """
-        if not self._chnPowered.getValue():
-            raise Exception("CATS power is not enabled. Please switch on arm power before transferring samples.")
+        if not self.isDeviceEnabled():
+            msg = "CATS power is not enabled. Please switch on arm power before transferring samples."
+            logging.getLogger("user_level_log").error(msg)
+            raise Exception(msg)
             
         selected=self.getSelectedSample()            
         if sample is not None:
@@ -240,6 +245,9 @@ class Cats90(SampleChanger):
         sample = (((selected.getBasketNo() - 1) % 3) * 10) + selected.getVialNo()
         argin = ["2", str(lid), str(sample), "0", "0", "0", "0", "0"]
             
+        loadedsample = self.getLoadedSample()
+        selectedsample = self.getSelectedSample()
+
         if self.hasLoadedSample():
             if selected==self.getLoadedSample():
                 raise Exception("The sample " + str(self.getLoadedSample().getAddress()) + " is already loaded")
@@ -248,6 +256,9 @@ class Cats90(SampleChanger):
         else:
             self._executeServerTask(self._cmdLoad, argin)
             
+    def _doChainedLoad(self, sample_to_unload=None, sample=None):
+        return self._doLoad(sample)
+
     def _doUnload(self,sample_slot=None):
         """
         Unloads a sample from the diffractometer.
@@ -255,8 +266,10 @@ class Cats90(SampleChanger):
         :returns: None
         :rtype: None
         """
-        if not self._chnPowered.getValue():
-            raise Exception("CATS power is not enabled. Please switch on arm power before transferring samples.")
+        if not self.isDeviceEnabled():
+            msg = "CATS power is not enabled. Please switch on arm power before transferring samples."
+            logging.getLogger("user_level_log").error(msg)
+            raise Exception(msg)
             
         if (sample_slot is not None):
             self._doSelect(sample_slot)
@@ -545,3 +558,8 @@ class Cats90(SampleChanger):
                     loaded = has_been_loaded = False
                     sample._setLoaded(loaded, has_been_loaded)
 
+def test():
+    pass
+
+if __name__ == '__main__':
+    test()

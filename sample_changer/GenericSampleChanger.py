@@ -179,6 +179,9 @@ class SampleChanger(Container,Equipment):
         """        
         return  self.state==SampleChangerState.Ready or self.state==SampleChangerState.Loaded or self.state==SampleChangerState.Charging or self.state==SampleChangerState.StandBy
     
+    def isDeviceEnabled(self):
+        return True
+
     def waitReady(self,timeout=-1):
         start=time.clock()
         while not self.isReady():
@@ -355,22 +358,48 @@ class SampleChanger(Container,Equipment):
         """
         Load a sample. 
         """    
-        sample = self._resolveComponent(sample)
+        if sample is not None:
+            sample = self._resolveComponent(sample)
+        else:
+            sample = self.getSelectedSample()
+
+        if not self.isDeviceEnabled():
+            msg="Device is not enabled. Suggestion: check power, connections and interlocks"
+            logging.getLogger("user_level_log").error(msg)
+            raise Exception(msg)
+
+        if sample is None:
+            raise Exception("(Generic SC) No sample selected for loading" )
+
         self.assertNotCharging()
-        #Do a chained load in this case
+
         if self.hasLoadedSample():    
-            #Do a chained load in this case
-            if (sample is None) or (sample==self.getLoadedSample()):
-                raise Exception("The sample " + str(self.getLoadedSample().getAddress()) + " is already loaded")
-            return self.chained_load(self.getLoadedSample(), sample)
-        else:    
-            return self._executeTask(SampleChangerState.Loading,wait,self._doLoad,sample)     
+            if (sample==self.getLoadedSample()):
+                raise Exception("(Generic SC) The sample " + str(self.getLoadedSample().getAddress()) + " is already loaded")
+
+            # Do a native chained load if implemented as this may have perfomance advantages
+            if hasattr(self, "_doChainedLoad"):
+                retval = self._executeTask(SampleChangerState.Loading,wait,self._doChainedLoad,self.getLoadedSample(),sample)     
+                logging.info("return value from chainedload is %s" % str(retval))
+                return retval
+            else:
+                return self.chained_load(self.getLoadedSample(), sample)
+        else:
+            retval = self._executeTask(SampleChangerState.Loading,wait,self._doLoad,sample)     
+            logging.info("return value from load is %s" % str(retval))
+            return retval
 
     def unload(self, sample_slot=None, wait=True):
         """
         Unload the sample. 
         If sample_slot=None, unloads to the same slot the sample was loaded from.        
         """
+
+        if not self.isDeviceEnabled():
+            msg="Device is not enabled. Suggestion: check power, connections and interlocks"
+            logging.getLogger("user_level_log").error(msg)
+            raise Exception("Device is not enabled. Check power and connections" )
+
         sample_slot = self._resolveComponent(sample_slot)
         self.assertNotCharging()
         #In case we have manually mounted we can command an unmount

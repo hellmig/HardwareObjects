@@ -255,6 +255,12 @@ class BESSYMultiCollect(AbstractMultiCollect, HardwareObject):
 
         self.getChannelObject("spec_messages").connectSignal("update", self.log_message_from_spec)
 
+        try:
+            self._last_image_chan =  self.getChannelObject("last_image_saved")
+        except:
+            logging.getLogger("HWR").info("Last image saved channel not configured in XML")
+            self._last_image_chan =  None
+
         self._detector.getCommandObject = self.getCommandObject
         self._detector.getChannelObject = self.getChannelObject
         self._detector.execute_command = self.execute_command
