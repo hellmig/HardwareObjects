@@ -147,7 +147,7 @@ class EscFilters(Equipment):
         #print "EscFilters.toggle: filter_index=%s" % filter_index
         attState = self.getAttState()
         #print "EscFilters.toggle: attState=%s" % attState
-        obj = self['atte'][filter_index - 1]
+        obj = self['atte'][filter_index]
         #print "EscFilters.toggle: obj.bits=%s" % obj.bits
         newState = attState ^ obj.bits
         #print "EscFilters.toggle: newState=%s" % newState
