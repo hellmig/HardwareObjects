@@ -62,7 +62,7 @@ class EscFilters(Equipment):
     @task
     def __timer_500ms_task(self, *args):
         while(True):
-            gevent.sleep(1.0)
+            gevent.sleep(0.5)
             self._onTimer500ms()
              
 
