@@ -121,6 +121,19 @@ class Cats90(SampleChanger):
                 basket_list.append(basket)
         return basket_list
 
+    def select(self, component, wait=True):
+        """
+        Overwrite select method of the GenericSampleChanger because the CATS saves the information of the 
+        selected basket and sample in the hardware object only.
+        A separate task is not needed here.
+
+        :returns: 
+        :rtype: integer
+        """
+        component = self._resolveComponent(component)
+        self._doSelect(component)
+        self._triggerSelectionChangedEvent()        
+        return 0
         
     #########################           TASKS           #########################
 
