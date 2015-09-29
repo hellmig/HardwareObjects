@@ -903,7 +903,7 @@ class EMBLMiniDiff(Equipment):
                              self.kappaMotor: centred_position.kappa,
                              self.kappaPhiMotor: centred_position.kappa_phi}
                 self.move_to_motors_positions(motor_pos)
-           except:
+            except:
                 logging.exception("Could not move to centred position")
         else:
             logging.getLogger("HWR").debug("Move to centred position disabled in BeamLocation phase.")
