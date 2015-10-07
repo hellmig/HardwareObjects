@@ -390,7 +390,7 @@ class Qt4_DiffractometerMockup(Equipment):
         Descript. :
         """
         self.current_centring_method = method
-        self.emit('centringStarted', (method, False))
+        self.emit('centringStarted', method, False)
 
     def accept_centring(self):
         """
