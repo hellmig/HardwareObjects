@@ -129,8 +129,8 @@ class ISPyBClient2(HardwareObject):
         """
         Init method declared by HardwareObject.
         """
-        session_hwobj = self.getObjectByRole('session')
-        self.beamline_name = session_hwobj.beamline_name
+        self.session_hwobj = self.getObjectByRole('session')
+        self.beamline_name = self.session_hwobj.beamline_name
         
         self.ws_user_name = self.getProperty("wsUserName")
         if not self.ws_user_name:
@@ -184,7 +184,7 @@ class ISPyBClient2(HardwareObject):
         # Add the porposal codes defined in the configuration xml file
         # to a directory. Used by translate()
         try:
-            proposals = session_hwobj['proposals']
+            proposals = self.session_hwobj['proposals']
             
             for proposal in proposals:
                 code = proposal.code

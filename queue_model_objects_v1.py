@@ -1061,22 +1061,31 @@ class PathTemplate(object):
         """
         # TODO make this more general. Add option to enable/disable archive
         # Also archive path template needs to be defined in xml
-        directory = self.directory[len(PathTemplate.base_directory):]
-        folders = directory.split('/') 
-        endstation_name = None
-        
-        if 'visitor' in folders:
-            endstation_name = folders[3]
-            folders[1] = PathTemplate.archive_folder
-            temp = folders[2]
-            folders[2] = folders[3]
-            folders[3] = temp
+        archive_directory = None
+        if PathTemplate.synchotron_name == "PETRA":
+            folders = self.directory.split('/')
+            endstation_name = None
+            archive_directory = os.path.join(PathTemplate.archive_base_directory,
+                                             PathTemplate.archive_folder)
+            archive_directory = os.path.join(archive_directory,
+                                             *folders[3:])
         else:
-            endstation_name = folders[1]
-            folders[1] = PathTemplate.archive_folder
-            folders[2] = endstation_name
+            directory = self.directory[len(PathTemplate.base_directory):]
+            folders = directory.split('/') 
+            endstation_name = None
+        
+            if 'visitor' in folders:
+                endstation_name = folders[3]
+                folders[1] = PathTemplate.archive_folder
+                temp = folders[2]
+                folders[2] = folders[3]
+                folders[3] = temp
+            else:
+                endstation_name = folders[1]
+                folders[1] = PathTemplate.archive_folder
+                folders[2] = endstation_name
 
-        archive_directory = os.path.join(PathTemplate.archive_base_directory, *folders[1:])
+            archive_directory = os.path.join(PathTemplate.archive_base_directory, *folders[1:])
 
         return archive_directory
 
@@ -1130,6 +1139,7 @@ class AcquisitionParameters(object):
         self.kappa_phi = float()
         self.exp_time = float()
         self.num_passes = int()
+        self.num_lines = 1
         self.energy = int()
         self.centred_position = CentredPosition()
         self.resolution = float()
@@ -1143,6 +1153,9 @@ class AcquisitionParameters(object):
         self.induce_burn = False
         self.mesh_steps = int()
         self.mesh_range = ()        
+        self.mesh_snapshot = None
+        self.comments = ""
+        self.in_queue = False 
 
 
 class Crystal(object):
@@ -1290,7 +1303,7 @@ def to_collect_dict(data_collection, session, sample, centred_pos=None):
                           'run_number': acquisition.path_template.run_number,
                           'process_directory': acquisition.\
                           path_template.process_directory},
-             #'in_queue': 0,
+             'in_queue': acq_params.in_queue,
              'detector_mode': acq_params.detector_mode,
              'shutterless': acq_params.shutterless,
              'sessionId': session.session_id,
@@ -1315,7 +1328,9 @@ def to_collect_dict(data_collection, session, sample, centred_pos=None):
                                        'overlap': acq_params.overlap,
                                        'start': acq_params.osc_start,
                                        'range': acq_params.osc_range,
-                                       'number_of_passes': acq_params.num_passes}],
+                                       'number_of_passes': acq_params.num_passes,
+                                       'number_of_lines': acq_params.num_lines,
+                                       'mesh_range': acq_params.mesh_range}],
              'group_id': data_collection.lims_group_id,
              'lims_start_pos_id': data_collection.lims_start_pos_id,
              'lims_end_pos_id': data_collection.lims_end_pos_id,
