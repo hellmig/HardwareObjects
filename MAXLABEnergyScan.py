@@ -11,7 +11,7 @@ import types
 import math
 import gevent
 
-class EnergyScan(Equipment):
+class MAXLABEnergyScan(Equipment):
     def init(self):
         self.ready_event = gevent.event.Event()
         self.scanning = None

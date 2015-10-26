@@ -3,9 +3,26 @@ import shutil
 import logging
 import os
 
+class Pilatus3_2M(PixelDetector):
+    def __init__(self,*args,**kwargs):
+      PixelDetector.__init__(self,*args,**kwargs)
+
+    @task
+    def prepare_acquisition(self, take_dark, start, osc_range, exptime, npass, number_of_images, comment=""):
+        self.new_acquisition = True
+        if  osc_range < 0.0001:
+            self.shutterless = False
+        take_dark = 0
+        if self.shutterless:
+            self.shutterless_range = osc_range*number_of_images
+            self.shutterless_exptime = (exptime + 0.00095)*number_of_images
+        self.execute_command("prepare_acquisition", take_dark, start, osc_range, exptime, npass, comment)
+        #self.getCommandObject("build_collect_seq").executeCommand("write_dp_inputs(COLLECT_SEQ,MXBCM_PARS)",wait=True)
+
+
 class ID232MultiCollect(ESRFMultiCollect):
     def __init__(self, name):
-        ESRFMultiCollect.__init__(self, name, PixelDetector(), FixedEnergy(0.8726, 14.2086))
+        ESRFMultiCollect.__init__(self, name, Pilatus3_2M(), FixedEnergy(0.8726, 14.2086))
 
     @task
     def data_collection_hook(self, data_collect_parameters):
@@ -17,8 +34,6 @@ class ID232MultiCollect(ESRFMultiCollect):
       data_collect_parameters["dark"] = 0
       # are we doing shutterless ?
       shutterless = data_collect_parameters.get("shutterless")
-      if data_collect_parameters.get("experiment_type") == 'Helical':
-          shutterless = False
       self._detector.shutterless = True if shutterless else False
       self.getChannelObject("shutterless").setValue(1 if shutterless else 0)
 

@@ -86,8 +86,10 @@ class QueueManager(HardwareObject, QueueEntryContainer):
 
     def __execute_task(self):
         self._running = True
-
-        for qe in self._queue_entry_list:
+        #TODO could more nicer signal name to disable minidiff during any queue entry execution
+        self.emit('centringAllowed', (False, ))
+        try:
+          for qe in self._queue_entry_list:
             try:
                 self.__execute_entry(qe)
             except (queue_entry.QueueAbortedException, Exception) as ex:
@@ -104,16 +106,17 @@ class QueueManager(HardwareObject, QueueEntryContainer):
                     logging.getLogger('user_level_log').\
                         error('Queue execution failed with: ' + str(ex.message))
 
-                self._running = False
                 raise ex
-
-        self._running = False
-        self.emit('queue_execution_finished', (None,))
+        finally:
+          self._running = False
+          self.emit('queue_execution_finished', (None,))
+          self.emit('centringAllowed', (True, ))
 
     def __execute_entry(self, entry): 
         if not entry.is_enabled() or self._is_stopped:
             return
         
+        self.emit('centringAllowed', (False, ))
         self._current_queue_entries.append(entry)
 
         logging.getLogger('queue_exec').info('Calling execute on: ' + str(entry))
@@ -173,6 +176,7 @@ class QueueManager(HardwareObject, QueueEntryContainer):
         # Reset the pause event, incase we were waiting.
         self.set_pause(False)
         self.emit('queue_stopped', (None,))
+        self.emit('centringAllowed', (True, )) 
         self._is_stopped = True
 
     def set_pause(self, state):
@@ -187,6 +191,7 @@ class QueueManager(HardwareObject, QueueEntryContainer):
         :rtype: NoneType
         """
         self.emit('queue_paused', (state,))
+        self.emit('centringAllowed', (True, ))
         if state:
             self._paused_event.clear()
         else:

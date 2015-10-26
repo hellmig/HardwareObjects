@@ -25,7 +25,8 @@ def grouped_processing(processEvent, params):
 
         endOfLineToExecute += ' -mode %s -collect %d:%s' % (processEvent, dataCollectionId, param_dict["xds_dir"])
 	endOfLineToExecute += ' -residues ' + str(residues) + ' -anomalous ' + str(anomalous) + \
-                              sg_opt + cell_opt + (param_dict["inverse_beam"] and ' -inverse' or '')
+                              sg_opt + cell_opt
+        # + (param_dict["inverse_beam"] and ' -inverse' or '')
     return endOfLineToExecute
 
 def start(programs, processEvent, paramsDict):
@@ -34,7 +35,6 @@ def start(programs, processEvent, paramsDict):
 	    allowed_events = program.getProperty("event").split(" ")
 	    if processEvent in allowed_events:
 		executable = program.getProperty('executable')
-		#opts = "-path"
 		
 		if os.path.isfile(executable):
                     if processEvent == "end_multicollect":
@@ -60,17 +60,11 @@ def start(programs, processEvent, paramsDict):
 					     ' -datacollectionID ' + str(dataCollectionId) +\
 					     ' -residues ' + str(residues) +\
 					     ' -anomalous ' + str(anomalous) +\
-					     sg_opt + cell_opt +\
-					     (paramsDict["inverse_beam"] and ' -inverse' or '')
-		    #if opts is not None:
-			#lineToExecute = executable + ' ' + opts + endOfLineToExecute
-		    #else:
+					     sg_opt + cell_opt #+\
+					     #(paramsDict["inverse_beam"] and ' -inverse' or '')
                     lineToExecute = executable + endOfLineToExecute + ' 2>&1 > /dev/null &'
 		    logging.info("Process event %s, executing %s" % (processEvent,str(lineToExecute)))
 
-		    # os.system is preferred to subprocess because we want to detach
-		    # the started program from the parent process group
-		    #os.system(str(lineToExecute))
                     subprocess.Popen(str(lineToExecute), shell=True, stdin=None,
                                      stdout=None, stderr=None, close_fds=True)
 		else:

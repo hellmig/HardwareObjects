@@ -102,7 +102,7 @@ class MicrodiffMotor(Device):
     def move(self, absolutePosition):
         if self.getState() != MicrodiffMotor.NOTINITIALIZED:
           self.position_attr.setValue(absolutePosition) #absolutePosition-self.offset)
-          self.motorStateChanged(MicrodiffMotor.MOVING) #from ESRF, 20140725, set MOVING state as soon as motion is supposed to be started
+          self.motorStateChanged(MicrodiffMotor.MOVING)
 
     def moveRelative(self, relativePosition):
         self.move(self.getPosition() + relativePosition)
