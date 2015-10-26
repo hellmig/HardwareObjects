@@ -10,7 +10,6 @@ import gevent
 import autoprocessing
 import gevent
 from HardwareRepository.TaskUtils import *
-
 BeamlineControl = collections.namedtuple('BeamlineControl',
                                          ['diffractometer',
                                           'sample_changer',
@@ -29,7 +28,6 @@ BeamlineControl = collections.namedtuple('BeamlineControl',
 
 BeamlineConfig = collections.namedtuple('BeamlineConfig',
                                         ['directory_prefix',
-                                         'synchrotron_name',
                                          'default_exposure_time',
                                          'minimum_exposure_time',
                                          'detector_fileext',
@@ -39,8 +37,8 @@ BeamlineConfig = collections.namedtuple('BeamlineConfig',
                                          'detector_px',
                                          'detector_py',
                                          'undulators',
-                                         'focusing_optic', 
-                                         'monochromator_type', 
+                                         'focusing_optic',
+                                         'monochromator_type',
                                          'beam_divergence_vertical',
                                          'beam_divergence_horizontal',
                                          'polarisation',
@@ -51,8 +49,6 @@ class AbstractMultiCollect(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self):
-#        self.bl_control = BeamlineControl(*[None]*12)
-#        self.bl_config = BeamlineConfig(*[None]*28)
         self.bl_control = BeamlineControl(*[None]*14)
         self.bl_config = BeamlineConfig(*[None]*16)
         self.data_collect_task = None

@@ -243,7 +243,9 @@ class Sample(TaskNode):
 
     def init_from_sc_sample(self, sc_sample):
         self.loc_str = str(sc_sample[1]) + ':' + str(sc_sample[2])
+        #JN, 20151026, int is required 
         self.location = (sc_sample[1], sc_sample[2])
+        #self.location=(int(sc_sample[1]), int(sc_sample[2]))
         self.set_name(self.loc_str)
         self.code=sc_sample[0]
 
@@ -357,9 +359,9 @@ class Basket(TaskNode):
         self._basket_object = sc_basket[1] #self.is_present = sc_basket[2]
         self.location = self._basket_object.getCoords() #sc_basket[0]
         if len(self.location) == 2:
-            self.name = "Cell %d, puck %d" % self.location
+            self.name = "Cell %s, puck %s" % self.location
         else:
-            self.name = "Puck %d" % self.location
+            self.name = "Puck %s" % self.location
 
     def get_name(self):
         return self.name
