@@ -87,6 +87,7 @@ class Qt4_DiffractometerMockup(Equipment):
         self.centring_time = None
         self.user_confirms_centring = None
         self.user_clicked_event = None
+        self.phase_list = None
 
         self.connect(self, 'equipmentReady', self.equipmentReady)
         self.connect(self, 'equipmentNotReady', self.equipmentNotReady)
@@ -131,18 +132,32 @@ class Qt4_DiffractometerMockup(Equipment):
         self.equipmentReady()
         self.user_clicked_event = AsyncResult()
 
-        self.beam_info_hwobj = HardwareRepository.HardwareRepository().\
-                                getHardwareObject(self.getProperty("beam_info"))
+        self.beam_info_hwobj = self.getObjectByRole("beam_info")
+
+        #self.beam_info_hwobj = HardwareRepository.HardwareRepository().\
+        #                        getHardwareObject(self.getProperty("beam_info"))
+
+        self.camera_hwobj = self.getObjectByRole("camera")
         if self.beam_info_hwobj is not None:
             self.connect(self.beam_info_hwobj, 'beamPosChanged', self.beam_position_changed)
         else:
             logging.getLogger("HWR").debug('Minidiff: Beaminfo is not defined')
+
+        try:
+            self.phase_list = eval(self.getProperty("phaseList"))
+        except:
+            self.phase_list = ['demo']
+
+        self.emit("minidiffStateChanged", 'testState')
 
     def getStatus(self):
         """
         Descript. :
         """
         return "ready"
+
+    def in_plate_mode(self):
+        return True
 
     def manual_centring(self):
         """
@@ -203,6 +218,17 @@ class Qt4_DiffractometerMockup(Equipment):
             self.centring_status = {"valid":False}
             self.emitProgressMessage("")
             self.emit('centringInvalid', ())
+
+    def get_centred_point_from_coord(self, x, y, return_by_names=None):
+        """
+        Descript. :
+        """
+        random_num = random.random() 
+        centred_pos_dir = {'phiy': random_num * 10, 'phiz': random_num,
+                         'sampx': 0.0, 'sampy': 9.3, 'zoom': 8.53,
+                         'phi': 311.1, 'focus': -0.42, 'kappa': 0.0009,
+                         ' kappa_phi': 311.0}
+        return centred_pos_dir
 
     def get_available_centring_methods(self):
         """
@@ -313,7 +339,6 @@ class Qt4_DiffractometerMockup(Equipment):
         """
         self.emit_progress_message("3 click centring...")
         self.current_centring_procedure = gevent.spawn(self.manual_centring)
-        print self.current_centring_procedure
         self.current_centring_procedure.link(self.manual_centring_done)	
 
     def start_automatic_centring(self, sample_info = None, loop_only = False):
@@ -365,7 +390,7 @@ class Qt4_DiffractometerMockup(Equipment):
         Descript. :
         """
         self.current_centring_method = method
-        self.emit('centringStarted', (method, False))
+        self.emit('centringStarted', method, False)
 
     def accept_centring(self):
         """
@@ -412,7 +437,6 @@ class Qt4_DiffractometerMockup(Equipment):
         """
         Descript. :
         """
-        print self.current_centring_procedure
         if self.current_centring_procedure is not None:
             curr_time = time.strftime("%Y-%m-%d %H:%M:%S")
             self.centring_status["endTime"] = curr_time
@@ -478,6 +502,7 @@ class Qt4_DiffractometerMockup(Equipment):
         """
         Descript. :
         """
+        self.emit("minidiffStateChanged", 'testState')
         if self.beam_info_hwobj: 
             self.beam_info_hwobj.beam_pos_hor_changed(300) 
             self.beam_info_hwobj.beam_pos_ver_changed(200)
@@ -497,7 +522,7 @@ class Qt4_DiffractometerMockup(Equipment):
     def move_motors(self, motors_dict):
         return
      
-    def start_2D_centring(self):
+    def start_2D_centring(self, coord_x=None, coord_y=None, omega=None):
         """
         Descript. :
         """
@@ -556,3 +581,11 @@ class Qt4_DiffractometerMockup(Equipment):
             self.emit('centringSnapshots', (True,))
             self.emit_progress_message("")
         self.emit_progress_message("Sample is centred!")
+
+    def update_values(self):
+        self.emit('zoomMotorPredefinedPositionChanged', None, None)
+        omega_ref = [100, 0]
+        self.emit('omegaReferenceChanged', omega_ref)
+
+    def get_phase_list(self):
+        return self.phase_list

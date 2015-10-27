@@ -17,22 +17,33 @@ class BeamlineSetup(HardwareObject):
 
         # For hardware objects that we would like to access as:
         # self.<role_name>_hwrobj. Just to make it more elegant syntactically.
-        self._role_list = ['transmission', 'diffractometer', 'sample_changer',
-                           'resolution', 'shape_history', 'session', 'beam_info',
-                           'data_analysis', 'workflow', 'lims_client',
-                           'omega_axis', 'kappa_axis', 'kappa_phi_axis',
-                           'collect', 'energy', 'xrf_scan', 'detector', 'energyscan']
+
+        #self._role_list = ['transmission', 'diffractometer', 'sample_changer', 'plate_manipulator',
+        #                   'resolution', 'shape_history', 'session', 'beam_info',
+        #                   'data_analysis', 'workflow', 'lims_client',
+        #                   'omega_axis', 'kappa_axis', 'kappa_phi_axis',
+        #                   'collect', 'energy', 'xrf_scan', 'detector', 'energyscan']
 
     def init(self):
         """
         Framework 2 init, inherited from HardwareObject.
         """
-        for role in self._role_list:
+ 
+        # 2015.10.05. Suggestion to read roles directly from xml, because 
+        #             qt3/qt4/web gui might use different hwboj
+  
+        for role in self.getRoles():
             self._get_object_by_role(role)
 
         self._object_by_path['/beamline/energy'] = self.energy_hwobj
         self._object_by_path['/beamline/resolution'] = self.resolution_hwobj
         self._object_by_path['/beamline/transmission'] = self.transmission_hwobj
+
+        self.advanced_methods = []
+        try:
+           self.advanced_methods = eval(self.getProperty("advancedMethods"))
+        except:
+           pass
 
     def _get_object_by_role(self, role):
         """
@@ -75,6 +86,9 @@ class BeamlineSetup(HardwareObject):
                 raise KeyError('Invalid path')
 
         return value
+
+    def get_advanced_methods(self):
+        return self.advanced_methods
 
     def set_plate_mode(self, state):
         """
@@ -159,8 +173,6 @@ class BeamlineSetup(HardwareObject):
         overlap = round(float(self[parent_key].getProperty('overlap')), 2)
         exp_time = round(float(self[parent_key].getProperty('exposure_time')), 4)
         num_passes = int(self[parent_key].getProperty('number_of_passes'))
-        shutterless = self.detector_hwobj.has_shutterless()
-        detector_mode = self.detector_hwobj.default_mode() 
 
         acq_parameters.first_image = int(img_start_num)
         acq_parameters.num_images = int(num_images)
@@ -175,13 +187,13 @@ class BeamlineSetup(HardwareObject):
         acq_parameters.energy = self._get_energy()
         acq_parameters.transmission = self._get_transmission()
 
+        acq_parameters.shutterless = self._has_shutterless()
+        acq_parameters.detector_mode = self._get_roi_modes()
+
         acq_parameters.inverse_beam = False
-        acq_parameters.shutterless = shutterless
         acq_parameters.take_dark_current = True
         acq_parameters.skip_existing_images = False
         acq_parameters.take_snapshots = True
-
-        acq_parameters.detector_mode = detector_mode
 
         return acq_parameters
 
@@ -265,8 +277,6 @@ class BeamlineSetup(HardwareObject):
         overlap = round(float(self[parent_key].getProperty('overlap')), 2)
         exp_time = round(float(self[parent_key].getProperty('exposure_time')), 4)
         num_passes = int(self[parent_key].getProperty('number_of_passes'))
-        shutterless = self.detector_hwobj.has_shutterless()
-        detector_mode = self.detector_hwobj.default_mode()
 
         acq_parameters.first_image = img_start_num
         acq_parameters.num_images = num_images
@@ -281,13 +291,14 @@ class BeamlineSetup(HardwareObject):
         acq_parameters.energy = self._get_energy()
         acq_parameters.transmission = self._get_transmission()
 
+        acq_parameters.shutterless = self._has_shutterless()
+        acq_parameters.detector_mode = self._get_roi_modes()
+
         acq_parameters.inverse_beam = False
-        acq_parameters.shutterless = shutterless
         acq_parameters.take_dark_current = True
         acq_parameters.skip_existing_images = False
         acq_parameters.take_snapshots = True
 
-        acq_parameters.detector_mode = detector_mode
 
         return acq_parameters
 
@@ -341,7 +352,7 @@ class BeamlineSetup(HardwareObject):
         path_template.wedge_prefix = ''
         path_template.run_number = self[parent_key].getProperty('run_number')
         path_template.suffix = self.session_hwobj["file_info"].getProperty('file_suffix')
-        path_template.precision = self.session_hwobj.default_precision
+        path_template.precision = '04'
         path_template.start_num = int(self[parent_key].getProperty('start_image_number'))
         path_template.num_files = int(self[parent_key].getProperty('number_of_images'))
 
@@ -380,16 +391,6 @@ class BeamlineSetup(HardwareObject):
 
         return resolution
  
-    #def _get_detector_mode(self):
-    #    """
-    #    Descript. :
-    #    """
-    #    try:
-    #        detector_mode = int(self.detector_hwobj.get_detector_mode())
-    #    except (AttributeError, TypeError):
-    #        detector_mode = 1
-    #    return detector_mode
-
     def _get_omega_axis_position(self):
         result = 0
 
@@ -424,4 +425,27 @@ class BeamlineSetup(HardwareObject):
             result = round(float(self.kappa_phi_axis_hwobj.getPosition()), 2)
         except:
             pass
+        return result
+
+    def _has_shutterless(self):
+        """
+        Descript. :
+        """
+        result = False
+        try:
+           result = self.detector_hwobj.has_shutterless()
+        except:
+           pass
+        return result
+
+
+    def _get_roi_modes(self):
+        """
+        Descript. :
+        """
+        result = []
+        try: 
+           result = self.detector_hwobj.get_roi_modes()
+        except:
+           pass
         return result

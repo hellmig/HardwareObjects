@@ -6,7 +6,6 @@ the QueueModel.
 import copy
 import os
 import queue_model_enumerables_v1 as queue_model_enumerables
-import logging
 
 class TaskNode(object):
     """
@@ -201,6 +200,7 @@ class Sample(TaskNode):
 
         # A pair <basket_number, sample_number>
         self.location = (None, None)
+        self.location_plate = None
         self.lims_location = (None, None)
 
         # Crystal information
@@ -243,11 +243,19 @@ class Sample(TaskNode):
 
     def init_from_sc_sample(self, sc_sample):
         self.loc_str = str(sc_sample[1]) + ':' + str(sc_sample[2])
-        #JN, 20151026, int is required 
         self.location = (sc_sample[1], sc_sample[2])
-        #self.location=(int(sc_sample[1]), int(sc_sample[2]))
         self.set_name(self.loc_str)
-        self.code=sc_sample[0]
+
+    def init_from_plate_sample(self, plate_sample):
+        """
+        Descript. : location : col, row, index
+        """
+        self.loc_str = "%s:%s:%s" %(chr(65 + int(plate_sample[1])),
+                                    str(plate_sample[2]),
+                                    str(plate_sample[3]))
+        self.location = (int(plate_sample[1]), int(plate_sample[2]), int(plate_sample[3]))
+        self.location_plate = plate_sample[5]
+        self.set_name(self.loc_str)
 
     def init_from_lims_object(self, lims_sample):
         if hasattr(lims_sample, 'cellA'):
@@ -284,9 +292,6 @@ class Sample(TaskNode):
 
         if hasattr(lims_sample, 'code'):
             self.lims_code = lims_sample.code
-            logging.getLogger("lism_code:%s" %self.lims_code)
-        else:
-            logging.getLogger("No code found from LIMS for this sample")
 
         if hasattr(lims_sample, 'holderLength'):
             self.holder_length = lims_sample.holderLength
@@ -354,20 +359,29 @@ class Basket(TaskNode):
     def is_present(self):
         return self.get_is_present()
 
-    def init_from_sc_basket(self, sc_basket):
-        print "init_from_sc_basket... ", sc_basket 
+    def init_from_sc_basket(self, sc_basket, name="Basket"):
+        """
+        TODO Agree on a correct method
         self._basket_object = sc_basket[1] #self.is_present = sc_basket[2]
         self.location = self._basket_object.getCoords() #sc_basket[0]
         if len(self.location) == 2:
-            self.name = "Cell %s, puck %s" % self.location
+            self.name = "Cell %d, puck %d" % self.location
         else:
-            self.name = "Puck %s" % self.location
+            self.name = "Puck %d" % self.location 
+        """
+        self.location = int(sc_basket[0])
+        if name == "Row":
+            self.name = "%s %s" % (name, chr(65 + self.location))
+        else:
+            self.name = "%s %d" % (name, self.location)
+        self._basket_object = sc_basket[1]
 
     def get_name(self):
         return self.name
 
     def get_location(self):
-        return self.location
+        #return int(self.location[0])
+        return self.location 
 
     def get_is_present(self):
         self._basket_object.present
@@ -910,6 +924,11 @@ class XRFScanResult(object):
         self.mca_calib = None
         self.mca_config = None
 
+class AdvancedScan(TaskNode):
+    def __init__(self, acquisition_list=None, crystal=None,
+                 processing_parameters=None, name=''):
+        TaskNode.__init__(self)
+
 class SampleCentring(TaskNode):
     def __init__(self, name = None, kappa = None, kappa_phi = None):
         TaskNode.__init__(self)
@@ -974,9 +993,18 @@ class Acquisition(object):
 
 class PathTemplate(object):
     @staticmethod
+    def set_data_base_path(base_directory):
+        # os.path.abspath returns path without trailing slash, if any
+        # eg. '/data/' => '/data'.
+        PathTemplate.base_directory = os.path.abspath(base_directory)
+    @staticmethod
     def set_archive_path(archive_base_directory, archive_folder):
-        PathTemplate.archive_base_directory = archive_base_directory
+        PathTemplate.archive_base_directory = os.path.abspath(archive_base_directory)
         PathTemplate.archive_folder = archive_folder
+
+    @staticmethod
+    def set_path_template_style(synchotron_name):
+        PathTemplate.synchotron_name = synchotron_name 
 
     def __init__(self):
         object.__init__(self)
@@ -1027,22 +1055,43 @@ class PathTemplate(object):
 
     def get_archive_directory(self):
         """
-        Returns the archive directory, for longer term storage.
-
-        :returns: Archive directory.
-        :rtype: str
+        Descript. : Returns the archive directory, for longer term storage.
+                    synchotron_name is set via static function calles from session hwobj
+        Return    : Archive directory. :rtype: str
         """
-        #TODO make this site specifi 
+        # TODO make this more general. Add option to enable/disable archive
+        # Also archive path template needs to be defined in xml
+        archive_directory = None
+        if PathTemplate.synchotron_name == "PETRA":
+            folders = self.directory.split('/')
+            endstation_name = None
+            archive_directory = os.path.join(PathTemplate.archive_base_directory,
+                                             PathTemplate.archive_folder)
+            archive_directory = os.path.join(archive_directory,
+                                             *folders[3:])
+        else:
+            directory = self.directory[len(PathTemplate.base_directory):]
+            folders = directory.split('/') 
+            endstation_name = None
+        
+            if 'visitor' in folders:
+                endstation_name = folders[3]
+                folders[1] = PathTemplate.archive_folder
+                temp = folders[2]
+                folders[2] = folders[3]
+                folders[3] = temp
+            else:
+                endstation_name = folders[1]
+                folders[1] = PathTemplate.archive_folder
+                folders[2] = endstation_name
 
-        folders = self.directory.split('/')
-        endstation_name = None
-
-        archive_directory = self.directory
-        archive_directory = archive_directory.replace("/data/data1/visitor", "/data/ispyb")
-        archive_directory = archive_directory.replace("/data/data1/inhouse", "/data/ispyb")
-        archive_directory = archive_directory.replace("/data/data1", "/data/ispyb")
-
-        logging.info("Archive direcotry is %s" % archive_directory)
+            archive_directory = os.path.join(PathTemplate.archive_base_directory, *folders[1:])
+        if PathTemplate.synchotron_name == "MAXLAB":
+            folders = self.directory.split('/')
+            archive_directory = self.directory
+            archive_directory = archive_directory.replace("/data/data1/visitor", "/data/ispyb")
+            archive_directory = archive_directory.replace("/data/data1/inhouse", "/data/ispyb")
+            archive_directory = archive_directory.replace("/data/data1", "/data/ispyb")
 
         return archive_directory
 
@@ -1096,6 +1145,7 @@ class AcquisitionParameters(object):
         self.kappa_phi = float()
         self.exp_time = float()
         self.num_passes = int()
+        self.num_lines = 1
         self.energy = int()
         self.centred_position = CentredPosition()
         self.resolution = float()
@@ -1109,6 +1159,9 @@ class AcquisitionParameters(object):
         self.induce_burn = False
         self.mesh_steps = int()
         self.mesh_range = ()        
+        self.mesh_snapshot = None
+        self.comments = ""
+        self.in_queue = False 
 
 
 class Crystal(object):
@@ -1145,7 +1198,7 @@ class CentredPosition(object):
         self.index = None
 
         for motor_name in CentredPosition.DIFFRACTOMETER_MOTOR_NAMES:
-           setattr(self, motor_name, 0)
+           setattr(self, motor_name, None)
 
         if motor_dict is not None:
           for motor_name, position in motor_dict.iteritems():
@@ -1159,7 +1212,16 @@ class CentredPosition(object):
         return str(self.as_dict())
 
     def __eq__(self, cpos):
-        return all([abs(getattr(self, motor_name) - getattr(cpos, motor_name))<=CentredPosition.MOTOR_POS_DELTA for motor_name in CentredPosition.DIFFRACTOMETER_MOTOR_NAMES])
+        eq = len(CentredPosition.DIFFRACTOMETER_MOTOR_NAMES)*[False]
+        for i, motor_name in enumerate(CentredPosition.DIFFRACTOMETER_MOTOR_NAMES):
+            self_pos = getattr(self, motor_name)
+            cpos_pos = getattr(cpos, motor_name)
+            eq[i] = self_pos == cpos_pos
+            if None in (self_pos, cpos_pos):
+               continue 
+            if not eq[i]:
+                eq[i] = abs(self_pos - cpos_pos) <= CentredPosition.MOTOR_POS_DELTA
+        return all(eq)
 
     def __ne__(self, cpos):
         return not (self == cpos)
@@ -1247,7 +1309,7 @@ def to_collect_dict(data_collection, session, sample, centred_pos=None):
                           'run_number': acquisition.path_template.run_number,
                           'process_directory': acquisition.\
                           path_template.process_directory},
-             #'in_queue': 0,
+             'in_queue': acq_params.in_queue,
              'detector_mode': acq_params.detector_mode,
              'shutterless': acq_params.shutterless,
              'sessionId': session.session_id,
@@ -1272,7 +1334,9 @@ def to_collect_dict(data_collection, session, sample, centred_pos=None):
                                        'overlap': acq_params.overlap,
                                        'start': acq_params.osc_start,
                                        'range': acq_params.osc_range,
-                                       'number_of_passes': acq_params.num_passes}],
+                                       'number_of_passes': acq_params.num_passes,
+                                       'number_of_lines': acq_params.num_lines,
+                                       'mesh_range': acq_params.mesh_range}],
              'group_id': data_collection.lims_group_id,
              'lims_start_pos_id': data_collection.lims_start_pos_id,
              'lims_end_pos_id': data_collection.lims_end_pos_id,

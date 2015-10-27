@@ -4,20 +4,15 @@ CATS sample changer hardware object.
 Implements the abstract interface of the GenericSampleChanger for the CATS
 sample changer model.
 Derived from Alexandre Gobbo's implementation for the EMBL SC3 sample changer.
-Derived from Michael Hellmig's implementation for the BESSY CATS sample changer
- -fix the Abort Bug
- -enable setondiff for the catsmaint object 
- -fix the bug of MD2 jam during exchange or unload
 """
 from .GenericSampleChanger import *
 import time
-import qt
 
-__author__ = "Jie Nan"
+__author__ = "Michael Hellmig"
 __credits__ = ["The MxCuBE collaboration"]
 
-__email__ = "jie.nan@maxlab.lu.se"
-__status__ = "Alpha"
+__email__ = "michael.hellmig@helmholtz-berlin.de"
+__status__ = "Beta"
 
 class Pin(Sample):        
     STD_HOLDERLENGTH = 22.0
@@ -72,7 +67,6 @@ class Cats90(SampleChanger):
         self._selected_sample = None
         self._selected_basket = None
         self._scIsCharging = None
-        self._startLoad =False # add flag to disable Load or UnLoad/Exchange Button immediately after 1 click (Avoid Click multiple times)
 
         # add support for CATS dewars with variable number of lids
         # assumption: each lid provides access to three baskets
@@ -90,11 +84,11 @@ class Cats90(SampleChanger):
         for i in range(Cats90.NO_OF_BASKETS):
             basket = Basket(self,i+1)
             self._addComponent(basket)
-            
-        for channel_name in ("_chnState", "_chnPowered", "_chnNumLoadedSample", "_chnLidLoadedSample", "_chnSampleBarcode", "_chnPathRunning", "_chnSampleIsDetected","_chnCurrentPhase", "_chnTransferMode"):
+
+        for channel_name in ("_chnState", "_chnPowered", "_chnNumLoadedSample", "_chnLidLoadedSample", "_chnSampleBarcode", "_chnPathRunning", "_chnSampleIsDetected"):
             setattr(self, channel_name, self.getChannelObject(channel_name))
            
-        for command_name in ("_cmdAbort", "_cmdLoad", "_cmdUnload", "_cmdChainedLoad","_cmdRestartMD2"):
+        for command_name in ("_cmdAbort", "_cmdLoad", "_cmdUnload", "_cmdChainedLoad"):
             setattr(self, command_name, self.getCommandObject(command_name))
 
         for basket_index in range(Cats90.NO_OF_BASKETS):            
@@ -181,68 +175,6 @@ class Cats90(SampleChanger):
             selected_basket_no = component.getIndex()+1
             selected_sample_no = None
         self._directlyUpdateSelectedComponent(selected_basket_no, selected_sample_no)
-
-# JN 20150324, load for CATS GUI, no timer and the window will not freeze
-    def load_cats(self, sample=None, wait=True):
-        """
-        Load a sample. 
-        """
-        sample = self._resolveComponent(sample)
-        self.assertNotCharging()
-        logging.info("call load without a timer")
-        if not self._chnPowered.getValue():
-#            raise Exception("CATS power is not enabled. Please switch on arm power before transferring samples.")
-            #logging.getLogger("HWR").error("CATS power is not enabled. Please switch on arm power before transferring samples.")
-            qt.QMessageBox.warning(None,"Error", "CATS power is not enabled. Please switch on arm power before transferring samples.")
-            return
-
-        # JN, 20150512, make sure MD2 TransferMode is "SAMPLE_CHANGER"
-        if not self._chnTransferMode.getValue()=="SAMPLE_CHANGER":
-            qt.QMessageBox.warning(None,"Error", "TransferMode is %s. Please set the value to SAMPLE_CHANGER in MD2 software." % str(self._chnTransferMode.getValue()))
-            return
-       
-        return self._executeTask(SampleChangerState.Loading,wait,self._doLoad,sample)
-
-# JN 20150324, add load for queue mount, sample centring can start after MD2 in Centring phase instead of waiting for CATS finishes completely
-    def load(self, sample=None, wait=True):
-        """
-        Load a sample. 
-         """
-        if not self._chnPowered.getValue():
-#            raise Exception("CATS power is not enabled. Please switch on arm power before transferring samples.")
-            #logging.getLogger("HWR").error("CATS power is not enabled. Please switch on arm power before transferring samples.")
-            qt.QMessageBox.warning(None,"Error", "CATS power is not enabled. Please switch on arm power before transferring samples.")
-            raise Exception("CATS power is not enabled. Please switch on arm power before transferring samples.")
-            return 
-
-        # JN, 20150512, make sure MD2 TransferMode is "SAMPLE_CHANGER"
-        if not self._chnTransferMode.getValue()=="SAMPLE_CHANGER":
-            qt.QMessageBox.warning(None,"Error", "TransferMode is %s. Please set the value to SAMPLE_CHANGER in MD2 software." % str(self._chnTransferMode.getValue()))
-            raise Exception("TransferMode is %s. Please set the value to SAMPLE_CHANGER in MD2 software." % str(self._chnTransferMode.getValue()))
-            return 
-
-        sample = self._resolveComponent(sample)
-        self.assertNotCharging()
-        #Do a chained load in this case
-        #if self.hasLoadedSample():    
-            #Do a chained load in this case
-            #raise Exception("A sample is loaded")
-            #if self.getLoadedSample() == sample:
-            #    raise Exception("The sample " + sample.getAddress() + " is already loaded")
-
-        #return self._executeTask(SampleChangerState.Loading,wait,self._doLoad,sample)
-        logging.info("call load with a timer")
-        self._executeTask(SampleChangerState.Loading,False,self._doLoad,sample)
-        timeout=0
-        time.sleep(20) # in case MD2 starts with Centring phase before loading the new sample
-        while self._chnCurrentPhase.getValue() != 'Centring':
-            if timeout > 60:
-                logging.info("waited for too long, change to centring mode manually")
-		return
-            time.sleep(1)
-            timeout+=1
-            logging.info("current phase is " + self._chnCurrentPhase.getValue())
-   
     def _doScan(self,component,recursive):
         """
         Scans the barcode of a single sample, puck or recursively even the complete sample changer.
@@ -309,14 +241,10 @@ class Cats90(SampleChanger):
             if selected==self.getLoadedSample():
                 raise Exception("The sample " + str(self.getLoadedSample().getAddress()) + " is already loaded")
             else:
-                self._startLoad = True
-                self._cmdRestartMD2(0) # fix the bug of waiting for MD2 by a hot restart, JN,20140708
-                time.sleep(5) # wait for the MD2 restart
-                self._startLoad = False
                 self._executeServerTask(self._cmdChainedLoad, argin)
         else:
             self._executeServerTask(self._cmdLoad, argin)
-
+            
     def _doUnload(self,sample_slot=None):
         """
         Unloads a sample from the diffractometer.
@@ -330,11 +258,6 @@ class Cats90(SampleChanger):
         if (sample_slot is not None):
             self._doSelect(sample_slot)
         argin = ["2", "0", "0", "0", "0"]
-        self._startLoad = True
-        
-        self._cmdRestartMD2(0) # fix the bug of waiting for MD2 by a hot restart, JN,20140703
-        time.sleep(5) # wait for the MD2 restart
-        self._startLoad = False
         self._executeServerTask(self._cmdUnload, argin)
 
     def clearBasketInfo(self, basket):
@@ -396,16 +319,15 @@ class Cats90(SampleChanger):
         if state == SampleChangerState.Moving and self._isDeviceBusy(self.getState()):
             #print "*** _updateState return"
             return          
-
-        #_chnSampleIsDetected does not exist in our CATS. 
         if self.hasLoadedSample() ^ self._chnSampleIsDetected.getValue():
             # go to Unknown state if a sample is detected on the gonio but not registered in the internal database
             # or registered but not on the gonio anymore
-            state = SampleChangerState.Unknown 
+            state = SampleChangerState.Unknown
         elif self._chnPathRunning.getValue() and not (state in [SampleChangerState.Loading, SampleChangerState.Unloading]):
             state = SampleChangerState.Moving
         elif self._scIsCharging and not (state in [SampleChangerState.Alarm, SampleChangerState.Moving, SampleChangerState.Loading, SampleChangerState.Unloading]):
             state = SampleChangerState.Charging
+        #print "*** _updateState: ", state
         self._setState(state)
        
     def _readState(self):
