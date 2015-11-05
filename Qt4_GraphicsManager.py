@@ -151,8 +151,10 @@ class Qt4_GraphicsManager(HardwareObject):
 
         self.diffractometer_hwobj = self.getObjectByRole("diffractometer")
         if self.diffractometer_hwobj:
-            self.diffractometer_zoom_changed()
-            self.connect(self.diffractometer_hwobj, "minidiffStateChanged", 
+            pixels_per_mm = self.diffractometer_hwobj.\
+                 get_pixels_per_mm()
+            self.diffractometer_pixels_per_mm_changed(pixels_per_mm)             
+            self.connect(self.diffractometer_hwobj, "stateChanged", 
                          self.diffractometer_changed)
             self.connect(self.diffractometer_hwobj, "centringStarted",
                          self.diffractometer_centring_started)
@@ -162,8 +164,8 @@ class Qt4_GraphicsManager(HardwareObject):
                          self.diffractometer_centring_successful)
             self.connect(self.diffractometer_hwobj, "centringFailed", 
                          self.diffractometer_centring_failed)
-            self.connect(self.diffractometer_hwobj, "zoomMotorPredefinedPositionChanged", 
-                         self.diffractometer_changed) 
+            self.connect(self.diffractometer_hwobj, "pixelsPerMmChanged", 
+                         self.diffractometer_pixels_per_mm_changed) 
             self.connect(self.diffractometer_hwobj, "omegaReferenceChanged", 
                          self.diffractometer_omega_reference_changed)
         else:
@@ -174,6 +176,7 @@ class Qt4_GraphicsManager(HardwareObject):
             self.beam_info_dict = self.beam_info_hwobj.get_beam_info()
             self.connect(self.beam_info_hwobj, "beamPositionChanged", self.beam_position_changed)
             self.connect(self.beam_info_hwobj, "beamInfoChanged", self.beam_info_changed)
+            self.beam_position_changed(self.beam_info_hwobj.get_beam_position())
         else:
             logging.getLogger("HWR").error("GraphicsManager: BeamInfo hwobj not defined")
 
@@ -198,8 +201,10 @@ class Qt4_GraphicsManager(HardwareObject):
         Descript. :
         """
         if position:
-            self.graphics_beam_item.set_start_position(beam_position[0],
-                 beam_position[1])
+            self.beam_position = position
+            self.graphics_beam_item.set_start_position(\
+                 self.beam_position[0],
+                 self.beam_position[1])
 
     def beam_info_changed(self, beam_info):
         """
@@ -272,12 +277,11 @@ class Qt4_GraphicsManager(HardwareObject):
         self.set_centring_state(False) 
         self.emit("centringFailed", method, centring_status)
 
-    def diffractometer_zoom_changed(self, position = None, offset = None):
+    def diffractometer_pixels_per_mm_changed(self, pixels_per_mm):
         """
         Descript. :
         """
-        pixels_per_mm = self.diffractometer_hwobj.get_pixels_per_mm()
-        if pixels_per_mm: 
+        if type(pixels_per_mm) in (list, tuple):
             if pixels_per_mm != self.pixels_per_mm:
                 self.pixels_per_mm = pixels_per_mm
                 for item in self.graphics_view.graphics_scene.items():
@@ -420,7 +424,8 @@ class Qt4_GraphicsManager(HardwareObject):
         Descript. :
         """ 
         if isinstance(item, GraphicsItemPoint):
-            self.diffractometer_hwobj.move_to_centred_position(item.centred_position)
+            self.diffractometer_hwobj.move_to_centred_position(\
+                 item.get_centred_positions()[0])
 
     def get_graphics_view(self):
         """
@@ -727,8 +732,10 @@ class Qt4_GraphicsManager(HardwareObject):
             self.diffractometer_hwobj.start_centring_method(\
                  self.diffractometer_hwobj.MANUAL3CLICK_MODE)
         else:
+            print 111
+            print self.beam_position
             self.diffractometer_hwobj.start_2D_centring(\
-                 self.mouse_position[0], self.mouse_position[1])
+                 self.beam_position[0], self.beam_position[1])
 
     def accept_centring(self):
         """
@@ -822,7 +829,7 @@ class GraphicsItem(QtGui.QGraphicsItem):
         self.index = None
         self.base_color = None
         self.used_count = 0
-        self.pixels_per_mm = [None, None]
+        self.pixels_per_mm = [0, 0]
         self.start_coord = [0, 0]
         self.end_coord = [0, 0]
         self.rect = QtCore.QRectF(0, 0, 0, 0)
@@ -893,6 +900,7 @@ class GraphicsItemBeam(GraphicsItem):
     def __init__(self, parent, position_x = 0, position_y= 0):
         GraphicsItem.__init__(self, parent, position_x = 0, position_y= 0)
         self.__shape_is_rectangle = True
+        self.__size_microns = [0, 0]
         self.__size_pix = [0, 0]
         self.start_coord = [position_x, position_y]
         self.setFlags(QtGui.QGraphicsItem.ItemIsMovable | \
@@ -922,9 +930,17 @@ class GraphicsItemBeam(GraphicsItem):
                          self.start_coord[0], self.start_coord[1] + 15)  
 
     def set_beam_info(self, beam_info_dict):
-        self.__shape_is_rectangle = beam_info_dict.get("shape") == "rectangular"
-        self.__size_pix = [beam_info_dict.get("size_x") * self.pixels_per_mm[0],
-                           beam_info_dict.get("size_y") * self.pixels_per_mm[1]]
+        self.__shape_is_rectangle = beam_info_dict["shape"] == "rectangular"
+        self.__size_microns[0] = beam_info_dict["size_x"]
+        self.__size_microns[1] = beam_info_dict["size_y"]
+                               
+        self.__size_pix[0] = self.__size_microns[0]* self.pixels_per_mm[0]
+        self.__size_pix[1] = self.__size_microns[1]* self.pixels_per_mm[1]
+
+    def set_pixels_per_mm(self, pixels_per_mm):
+        self.pixels_per_mm = pixels_per_mm
+        self.__size_pix[0] = self.__size_microns[0]* self.pixels_per_mm[0]
+        self.__size_pix[1] = self.__size_microns[1]* self.pixels_per_mm[1]
 
 class GraphicsItemPoint(GraphicsItem):
     """
@@ -1417,7 +1433,6 @@ class GraphicsItemScale(GraphicsItem):
 
     def set_pixels_per_mm(self, pixels_per_mm):
         self.pixels_per_mm = pixels_per_mm
-        
         for line_len in GraphicsItemScale.HOR_LINE_LEN:
             if self.pixels_per_mm[0] * line_len / 1000 <= 250:
                self.__scale_len = line_len
