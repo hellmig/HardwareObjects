@@ -19,7 +19,37 @@ class ISPyBClient2Mockup(HardwareObject):
         HardwareObject.__init__(self, name)
         self.__translations = {}
         self.__disabled = False
+        self.__test_proposal = None
 
+    def init(self):
+        self.session_hwobj = self.getObjectByRole('session')
+        if self.session_hwobj:
+            self.beamline_name = self.session_hwobj.beamline_name
+        else:
+            self.beamline_name = 'ID:TEST'
+
+
+        self.__test_proposal = {'status': {'code': 'ok'},
+                'Person': {'personId': 1,
+                           'laboratoryId': 1,
+                           'login': None,
+                           'familyName':'operator on IDTESTeh1'},
+                'Proposal': {'code': 'idtest',
+                             'title': 'operator on IDTESTeh1',
+                             'personId': 1,
+                             'number': '000',
+                             'proposalId': 1,
+                             'type': 'MX'},
+                'Sessions': [{'scheduled': 0,
+                             'startDate': '2015-06-11 00:00:00',
+                             'endDate': '2017-06-12 07:59:59',
+                             'beamlineName': self.beamline_name,
+                             'timeStamp': datetime.datetime(2015, 6, 11, 9, 40, 36),
+                             'comments': 'Session created by the BCM',
+                             'sessionId': 34591,
+                             'proposalId': 1, 'nbShifts': 3}],
+                'Laboratory': {'laboratoryId': 1,
+                               'name': 'TEST eh1'}}
 
     def get_proposal(self, proposal_code, proposal_number):
         """
@@ -35,30 +65,10 @@ class ISPyBClient2Mockup(HardwareObject):
         :returns: The dict (Proposal, Person, Laboratory, Sessions, Status).
         :rtype: dict
         """
+        return self.__test_proposal
 
-        return {'status': {'code': 'ok'},
-                'Person': {'personId': 1,
-                           'laboratoryId': 1,
-                           'login': None,
-                           'familyName':'operator on IDTESTeh1'},
-                'Proposal': {'code': 'idtest',
-                             'title': 'operator on IDTESTeh1',
-                             'personId': 1,
-                             'number': '000',
-                             'proposalId': 1,
-                             'type': 'MX'},
-                'Session': [{'scheduled': 0,
-                             'startDate': '2013-06-11 00:00:00',
-                             'endDate': '2013-06-12 07:59:59',
-                             'beamlineName': 'ID:TEST',
-                             'timeStamp': datetime.datetime(2013, 6, 11, 9, 40, 36),
-                             'comments': 'Session created by the BCM',
-                             'sessionId': 34591,
-                             'proposalId': 1, 'nbShifts': 3}],
-                'Laboratory': {'laboratoryId': 1,
-                               'name': 'TEST eh1'}}
-
-
+    def get_proposals_by_user(self, user_name):
+        return [self.__test_proposal]
 
     def get_session_local_contact(self, session_id):
         return  {'personId': 1,
