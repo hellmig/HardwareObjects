@@ -136,12 +136,17 @@ class Qt4_DiffractometerMockup(Equipment):
         else:
             logging.getLogger("HWR").debug('Minidiff: Beaminfo is not defined')
 
+        self.reversing_rotation = self.getProperty("reversingRotation")
+        try:
+            self.grid_direction = eval(self.getProperty("gridDirection"))
+        except:
+            self.grid_direction = {"fast": (0, 1), "slow": (1, 0)}
+
         try:
             self.phase_list = eval(self.getProperty("phaseList"))
         except:
             self.phase_list = ['demo']
 
-        self.emit("minidiffStateChanged", 'testState')
 
     def getStatus(self):
         """
@@ -151,6 +156,15 @@ class Qt4_DiffractometerMockup(Equipment):
 
     def in_plate_mode(self):
         return True
+
+    def is_reversing_rotation(self):
+        return True
+
+    def get_grid_direction(self):
+        """
+        Descript. :
+        """
+        return self.grid_direction
 
     def manual_centring(self):
         """

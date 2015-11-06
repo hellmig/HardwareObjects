@@ -381,7 +381,9 @@ class Qt4_GraphicsManager(HardwareObject):
             self.graphics_grid_draw_item.fix_motor_pos_center()
             self.wait_grid_drawing_click = False
             self.in_grid_drawing_state = False
+            self.de_select_all()
             self.emit("shapeCreated", self.graphics_grid_draw_item, "Grid")
+            self.graphics_grid_draw_item.setSelected(True) 
             self.shape_dict[self.graphics_grid_draw_item.get_display_name()] = \
                  self.graphics_grid_draw_item
         else:
@@ -1178,6 +1180,9 @@ class GraphicsItemLine(GraphicsItem):
     def get_graphical_points(self):
         return (self.__cp_start, self.__cp_end)
 
+    def get_centred_positions(self):
+        return (self.__cp_start.get_centred_position(), \
+                self.__cp_end.get_centred_position())
 
 class GraphicsItemGrid(GraphicsItem):
     """
@@ -1208,7 +1213,7 @@ class GraphicsItemGrid(GraphicsItem):
         self.__cell_size_pix = [0, 0]
         self.__corner_coord = [[0, 0], [0, 0], [0, 0], [0, 0]]
         self.__center_coord = [0, 0]
-        self.__num_colls = 0      
+        self.__num_cols = 0      
         self.__num_rows = 0
         self.__num_lines = 0
         self.__num_images_per_line = 0
@@ -1217,8 +1222,10 @@ class GraphicsItemGrid(GraphicsItem):
         self.__draw_mode = False
         self.__draw_projection = False
 
+        self.__osc_start = None
         self.__motor_pos_corner = None
         self.__centred_position = None
+        self.__grid_snapshot = None
         self.__grid_size_pix = [0, 0]
         self.__grid_range_pix = {"fast": 0, "slow": 0}
         self.__grid_direction = {"fast": (0, 1), "slow": (1, 0)}
@@ -1236,11 +1243,11 @@ class GraphicsItemGrid(GraphicsItem):
                 self.__beam_size_microns[0], self.__beam_size_microns[1])
   
     def get_col_row_num(self):
-        return self.__num_colls, self.__num_rows
+        return self.__num_cols, self.__num_rows
  
-    def get_grid_range_mm(self):
-        return [float(self.__cell_size_microns[0] * (self.__num_colls - 1) / 1000), \
-                float(self.__cell_size_microns[1] * (self.__num_rows - 1) / 1000)] 
+    def get_grid_size_mm(self):
+        return (float(self.__cell_size_microns[0] * (self.__num_cols - 1) / 1000), \
+                float(self.__cell_size_microns[1] * (self.__num_rows - 1) / 1000)) 
  
     def update_item(self):
         self.__cell_size_microns = [self.__beam_size_microns[0] + self.__spacing_microns[0] * 2,
@@ -1275,25 +1282,25 @@ class GraphicsItemGrid(GraphicsItem):
             self.__corner_coord[3][1] = pos_y
   
         #Number of columns and rows is calculated
-        num_colls = int(abs(self.__corner_coord[1][0] - \
+        num_cols = int(abs(self.__corner_coord[1][0] - \
             self.__corner_coord[0][0]) / self.__cell_size_pix[0])
         num_rows = int(abs((self.__corner_coord[3][1] - \
             self.__corner_coord[1][1]) / self.__cell_size_pix[1]))
 
-        if num_rows * num_colls > pow(2, 16):
+        if num_rows * num_cols > pow(2, 16):
             msg_text = "Unable to draw grid containing more than %d cells!" % pow(2, 16)
             logging.getLogger("user_level_log").info(msg_text)
         else:
-            self.__num_colls = num_colls
+            self.__num_cols = num_cols
             self.__num_rows = num_rows
 
             #Based on the grid directions estimates number of lines and 
             #number of images per line
             self.__num_lines =  abs(self.__grid_direction['fast'][1] * \
-                 self.__num_colls) + abs(self.__grid_direction['slow'][1] * \
+                 self.__num_cols) + abs(self.__grid_direction['slow'][1] * \
                  self.__num_rows)
             self.__num_images_per_line = abs(self.__grid_direction['fast'][0] * \
-                self.__num_colls) + abs(self.__grid_direction['slow'][0] * \
+                self.__num_cols) + abs(self.__grid_direction['slow'][0] * \
                 self.__num_rows)
 
             self.__center_coord[0] = min(self.__corner_coord[0][0],
@@ -1305,7 +1312,7 @@ class GraphicsItemGrid(GraphicsItem):
 
  
     def update_grid_draw_parameters(self):
-        self.__grid_size_pix = [self.__num_colls * self.__cell_size_pix[0],
+        self.__grid_size_pix = [self.__num_cols * self.__cell_size_pix[0],
                                 self.__num_rows * self.__cell_size_pix[1]]
         #Also grid range is estimated 
         self.__grid_range_pix["fast"] = abs(self.__grid_direction['fast'][0] * \
@@ -1338,11 +1345,18 @@ class GraphicsItemGrid(GraphicsItem):
         return self.__draw_mode
 
     def get_properties(self):
+        (dx_mm, dy_mm) = self.get_grid_size_mm()
         return {"name": "Grid %d" % self.index,
-                "beam_hor" : self.__beam_size_microns[0],
-                "beam_ver" : self.__beam_size_microns[1],
-                "spacing_hor": self.__spacing_microns[0],
-                "spacing_ver": self.__spacing_microns[1],  
+                "direction":  self.__grid_direction,
+                "reversing_rotation": self.__reversing_rotation,
+                "steps_x": self.__num_cols,
+                "steps_y": self.__num_rows, 
+                #"beam_hor" : self.__beam_size_microns[0],
+                #"beam_ver" : self.__beam_size_microns[1],
+                "xOffset": self.__spacing_microns[0],
+                "yOffset": self.__spacing_microns[1],  
+                "dx_mm": dx_mm,
+                "dy_mm": dy_mm,
                 "num_lines": self.__num_lines,
                 "num_images_per_line": self.__num_images_per_line,
                 "first_image_num": self.__first_image_num}
@@ -1356,9 +1370,6 @@ class GraphicsItemGrid(GraphicsItem):
     #    #self.__corner_coord = properties_dict.get("corner_coord")
     #    self.__num_col = properties_dict.get("num_col")
     #    self.__num_row = properties_dict.get("num_row")
-
-    def get_centred_position(self):
-        return self.__centred_position
 
     def get_corner_coord(self):
         return self.__corner_coord
@@ -1374,6 +1385,18 @@ class GraphicsItemGrid(GraphicsItem):
              get_centred_point_from_coord(self.__center_coord[0],
                                           self.__center_coord[1])
         self.__centred_position = queue_model_objects.CentredPosition(motor_pos)
+        print 111, type(self.__centred_position)
+        self.__osc_start = self.__centred_position.phi
+
+    def get_centred_position(self):
+        print 111, type(self.__centred_position)
+        return self.__centred_position
+
+    def set_score(self, score):
+        self.__score = score
+
+    def get_grid_snapshot(self):
+        return self.__grid_snapshot
 
     def paint(self, painter, option, widget):
         pen = QtGui.QPen(self.solid_line_style)
@@ -1398,7 +1421,7 @@ class GraphicsItemGrid(GraphicsItem):
             draw_start_y = self.__center_coord[1] - self.__grid_size_pix[1] / 2.0
 
             # Horizontal and vertical grid lines
-            for i in range(0, self.__num_colls + 1):
+            for i in range(0, self.__num_cols + 1):
                 offset = i * self.__cell_size_pix[0]
                 painter.drawLine(draw_start_x + offset, draw_start_y,
                                  draw_start_x + offset, draw_start_y + \
@@ -1406,14 +1429,14 @@ class GraphicsItemGrid(GraphicsItem):
             for i in range(0, self.__num_rows + 1):
                 offset = i * self.__cell_size_pix[1]
                 painter.drawLine(draw_start_x, draw_start_y + offset,
-                                 draw_start_x + self.__num_colls * self.__cell_size_pix[0],
+                                 draw_start_x + self.__num_cols * self.__cell_size_pix[0],
                                  draw_start_y + offset)    
 
             #Draws beam shape and displays number of image if 
             #less than 1000 cells and size is greater than 20px
             cell_index = 0
-            if self.__num_colls * self.__num_rows < 1000 and self.__cell_size_pix[1] > 20:
-                for col in range(self.__num_colls):
+            if self.__num_cols * self.__num_rows < 1000 and self.__cell_size_pix[1] > 20:
+                for col in range(self.__num_cols):
                     coll_offset = col * self.__cell_size_pix[0]
                     for row in range(self.__num_rows):
                         row_offset = row * self.__cell_size_pix[1]
@@ -1425,7 +1448,7 @@ class GraphicsItemGrid(GraphicsItem):
                             painter.drawEllipse(draw_start_x + coll_offset + self.__spacing_pix[0],
                                                 draw_start_y + row_offset + self.__spacing_pix[1],
                                                 self.__beam_size_pix[0], self.__beam_size_pix[1])
-                for col in range(self.__num_colls):
+                for col in range(self.__num_cols):
                     for row in range(self.__num_rows):
                         line, image = self.get_line_image_num(cell_index + self.__first_image_num)
                         x, y = self.get_coord_from_line_image(line, image)
@@ -1433,7 +1456,7 @@ class GraphicsItemGrid(GraphicsItem):
                                           y - self.__cell_size_pix[1] / 2,
                                           self.__cell_size_pix[0], 
                                           self.__cell_size_pix[1])
-                        if self.__score:
+                        if self.__score is not None:
                             painter.drawText(tr, QtCore.Qt.AlignCenter, "%0.3f" % \
                                     self.__score[cell_index - 1])
                         else:
@@ -1470,7 +1493,7 @@ class GraphicsItemGrid(GraphicsItem):
         self.scene().update()
 
     def get_size_pix(self):
-        width_pix = self.__cell_size_pix[0] * self.__num_colls
+        width_pix = self.__cell_size_pix[0] * self.__num_cols
         height_pix = self.__cell_size_pix[1] * self.__num_rows
         return (width_pix, height_pix) 
 
@@ -1543,6 +1566,59 @@ class GraphicsItemGrid(GraphicsItem):
 
         return image, line, image_serial
 
+    def get_col_row_from_image_serial(self, image_serial):
+        line, image = self.get_line_image_num(image_serial)
+        return self.get_col_row_from_line_image(line, image)
+
+    def get_col_row_from_line_image(self, line, image):
+        """
+        Descript. :  converts frame grid coordinates from scan grid 
+                     ("slow","fast") to screen grid ("col","raw"),
+                     i.e. rotates/inverts the scan coordinates into 
+                     grid coordinates.
+        """
+        ref_fast, ref_slow = self.get_coord_ref_from_line_image(line, image)
+
+        col = self.__num_cols / 2.0 + (self.__num_images_per_line - 1) * \
+              self.__grid_direction['fast'][0] * ref_fast  + (self.__num_lines - 1) * \
+              self.__grid_direction['slow'][0] * ref_slow
+        row = self.__num_rows / 2.0 + (self.__num_images_per_line - 1) * \
+              self.__grid_direction['fast'][1] * ref_fast  + (self.__num_lines - 1) * \
+              self.__grid_direction['slow'][1] * ref_slow
+        return int(col), int(row)
+
+    def get_motor_pos_from_col_row(self, col, row, as_cpos=False):
+        """
+        Descript. : x = x(click - x_middle_of_the_plot), y== the same 
+        """
+
+        new_point = copy.deepcopy(self.__centred_position.as_dict())
+        (hor_range, ver_range) = self.get_grid_size_mm()
+        hor_range = - hor_range * (self.__num_cols / 2.0 - col) / self.__num_cols
+        ver_range = - ver_range * (self.__num_rows / 2.0 - row) / self.__num_rows
+
+        """
+        MD3
+        omega_ref = 163.675
+        new_point['sampx'] = new_point['sampx'] - hor_range  * \
+                             math.sin(math.pi * (self.__osc_start - omega_ref) / 180.0)
+        new_point['sampy'] = new_point['sampy'] + hor_range  * \
+                             math.cos(math.pi * (self.__osc_start - omega_ref) / 180.0)
+        new_point['phiy'] = new_point['phiy'] - ver_range
+        """
+
+        #MD2
+        omega_ref = 0.0
+        new_point['sampx'] = new_point['sampx'] + ver_range  * \
+                             math.sin(math.pi * (self.__osc_start - omega_ref) / 180.0)
+        new_point['sampy'] = new_point['sampy'] - ver_range  * \
+                             math.cos(math.pi * (self.__osc_start - omega_ref) / 180.0)
+        new_point['phiy'] = new_point['phiy'] - hor_range
+
+        if as_cpos:
+            return queue_model_objects.CentredPosition(new_point)
+        else:
+            return new_point
  
 class GraphicsItemScale(GraphicsItem):
     """
