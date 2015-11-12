@@ -40,7 +40,10 @@ class Xtal(Sample):
     __LOGIN_PROPERTY__ = "Login"
 
     def __init__(self,drop, index):
+        #Sample.__init__(self, drop, Xtal._getXtalAddress(drop, index), False)
         super(Xtal, self).__init__(drop, Xtal._getXtalAddress(drop, index), False)
+        self._drop = drop
+        self._index = index
         self._setImageX(None)
         self._setImageY(None)
         self._setImageURL(None)
@@ -64,26 +67,48 @@ class Xtal(Sample):
         return self.getProperty(self.__LOGIN_PROPERTY__)
 
     def getDrop(self):
-        return self.getContainer()
+        return self._drop
 
     def getCell(self):
         return self.getDrop().getCell()
 
     @staticmethod
-    def _getXtalAddress(well, index):
-        return str(well.getAddress()) + "-" + str(index)
+    def _getXtalAddress(drop, index):
+        return str(drop.getAddress()) + "-" + str(index)
+
+    def getIndex(self):
+        """
+        Descript. : Sample index is calculated relaive to the row (Basket)
+                    In this case we assume that in drop is one xtal
+                    This should be changed to various num of xtals in the drop
+        """
+        cell_index = self.getCell().getIndex()
+        drops_in_cell_num = self.getCell().getDropsNo()
+        drop_index = self._drop.getIndex()       
+        return cell_index  * drops_in_cell_num + drop_index
+
+    def getContainer(self):
+        return self.getCell().getContainer()
+
+    def getName(self):
+        return "%s%d:%d" %(self.getCell().getRowChr(), 
+                            self.getCell().getIndex() + 1, 
+                            self._drop.getIndex() + 1)     
 
 class Drop(Container):
     __TYPE__ = "Drop"
-    def __init__(self,cell, well_no):
-        super(Drop, self).__init__(self.__TYPE__,cell, Drop._getWellAddress(cell, well_no), False)
+    def __init__(self, cell, drops_num):
+        super(Drop, self).__init__(self.__TYPE__,cell, \
+              Drop._getDropAddress(cell, drops_num), False)
+        self._cell = cell
+        self._drops_num = drops_num
          
     @staticmethod
-    def _getWellAddress(cell, well_no):
-        return str(cell.getAddress()) + ":" + str(well_no)
+    def _getDropAddress(cell, drop_num):
+        return str(cell.getAddress()) + ":" + str(drop_num)
 
     def getCell(self):
-        return self.getContainer()
+        return self._cell
 
     def getWellNo(self):
         return self.getIndex() + 1
@@ -102,33 +127,43 @@ class Drop(Container):
         """ 
         sample = self.getComponents()
         return sample[0]
- 
+
+    #def getIndex(self):
+    #    """
+    #    Descript. Drop index is relative to the row
+    #    """ 
+    #    return self._well_no 
 
 class Cell(Container):
     __TYPE__ = "Cell"
-    def __init__(self, container, row, col, wells):
-        super(Cell, self).__init__(self.__TYPE__,container,Cell._getCellAddress(row,col),False)
-        self._row=row
-        self._col=col
-        self._wells=wells
-        for i in range(wells):
-            drop = Drop(self, i + 1)
+    def __init__(self, row, row_chr, col_index, drops_num):
+        Container.__init__(self, self.__TYPE__, row, \
+            Cell._getCellAddress(row_chr, col_index), False)
+        self._row = row
+        self._row_chr = row_chr
+        self._col_index = col_index
+        self._drops_num = drops_num
+        for drop_index in range(self._drops_num):
+            drop = Drop(self, drop_index + 1)
             self._addComponent(drop)
-            xtal = Xtal(drop,drop.getNumberOfComponents())
+            xtal = Xtal(drop, drop.getNumberOfComponents())
             drop._addComponent(xtal)
         self._transient=True
 
     def getRow(self):
         return self._row
 
+    def getRowChr(self):
+        return self._row_chr
+
     def getRowIndex(self):
-        return ord(self._row.upper()) - ord('A')
+        return ord(self._row_chr.upper()) - ord('A')
 
     def getCol(self):
-        return self._col
+        return self._col_index
 
-    def getWellsNo(self):
-        return self._wells
+    def getDropsNo(self):
+        return self._drops_num
 
     @staticmethod
     def _getCellAddress(row, col):
@@ -193,7 +228,9 @@ class PlateManipulator(SampleChanger):
 
         self.current_phase_changed('Centring')
         self._onStateChanged('Ready')
- 
+
+    def get_num_drops_per_cell(self):
+        return self.num_drops 
 
     def current_phase_changed(self, phase):
         self.current_phase = phase
@@ -201,11 +238,15 @@ class PlateManipulator(SampleChanger):
 
     def plate_location_changed(self, location):
         """
-        Descript. : col, row, x, y
+        Descript. : current locatin is defined as list : 
+                    (col, row, x, y)
         """
         self.current_location = location
         self._updateLoadedSample()
-        
+
+    def move_to_xy(self, pos_x, pos_y):
+        print pos_x, pos_y 
+
     def _onStateChanged(self, state):
         """
         Descript. : state change callback. Based on diffractometer state
@@ -232,9 +273,12 @@ class PlateManipulator(SampleChanger):
         self._setInfo(False, None, False)
         self._clearComponents()
         for row in range(self.num_rows):
+            #row is like a basket
+            basket = Basket(self, row + 1,samples_num=0, name="Row")
+            self._addComponent(basket)
             for col in range(self.num_cols):
-                cell = Cell(self, chr(65 + row), col + 1, self.num_drops)
-                self._addComponent(cell)
+                cell = Cell(basket, chr(65 + row), col + 1, self.num_drops)
+                basket._addComponent(cell)
 
     def _doAbort(self):
         """
@@ -255,6 +299,7 @@ class PlateManipulator(SampleChanger):
         """
         Descript. :
         """
+
         #Agree on which level to select
         selected=self.getSelectedSample()
         if (element is None):
@@ -262,14 +307,16 @@ class PlateManipulator(SampleChanger):
         if (element is not None):
             if (element!=selected):
                 #Here is actual move 
+                print element
                 self._doSelect(element)
-            self._setLoadedSample(element)
+            #self._setLoadedSample(element)
 
     def _doUnload(self,sample_slot=None):
         """
         Descript. :
         """
         self._resetLoadedSample()
+        self._onStateChanged('Ready') 
 
     def _doReset(self):
         """
@@ -300,10 +347,10 @@ class PlateManipulator(SampleChanger):
             logging.getLogger("user_level_log").info(msg) 
             self._setInfo(True,pp.Plate.Barcode,True)
 
-            for x in pp.Plate.Xtal:
+            for x in pp.Plate.xtal_list:
                 cell = self.getComponentByAddress(Cell._getCellAddress(x.Row, x.Column))
                 cell._setInfo(True,"",True)
-                drop = self.getComponentByAddress(Drop._getWellAddress(cell,x.Shelf))
+                drop = self.getComponentByAddress(Drop._getDropAddress(cell,x.Shelf))
                 drop._setInfo(True,"",True)
                 xtal = Xtal(drop,drop.getNumberOfComponents())
                 xtal._setInfo(True,x.PinID,True)
@@ -320,19 +367,28 @@ class PlateManipulator(SampleChanger):
         """
         Descript. :
         """
+        pos_x = self.reference_pos_x
+        pos_y = 0.5
+
         if isinstance(component, Xtal):
-            col = xtal.Column
+            col = component.Column
             row = ord(component.Row.upper()) - ord('A')
             #TODO add image maching here
-            pos_x = 0.5
-            pos_y = 0.5
             #location = [row, xtal.Column, pos_x, pos_y]
             component.getContainer()._setSelected(True)
             component.getContainer().getContainer()._setSelected(True)
+        elif isinstance(component, Crims.CrimsXtal):
+           col = component.Column - 1 
+           row = ord(component.Row.upper()) - ord('A') 
+           pos_x = component.offsetX
+           pos_y = component.offsetY
+           cell = self.getComponentByAddress(Cell._getCellAddress(component.Row, component.Column))
+           drop = self.getComponentByAddress(Drop._getDropAddress(cell, component.Shelf))
+           drop._setSelected(True)
+           drop.getContainer()._setSelected(True)         
         elif isinstance(component, Drop):
             row = component.getCell().getRowIndex()
             col = component.getCell().getCol() - 1
-            pos_x = self.reference_pos_x
             pos_y = component.getWellNo() / float(self.num_drops + 1)
             component._setSelected(True)
             component.getContainer().getContainer()._setSelected(True)
@@ -340,8 +396,15 @@ class PlateManipulator(SampleChanger):
             row = component.getRowIndex()
             col = component.getCol()-1
             pos_x = self.reference_pos_x
-            pos_y = 0.5
             component._setSelected(True)
+        elif isinstance(component, list):
+            row = component[0]
+            col = component[1]
+            if len(component > 2):
+                pos_x = component[2]
+                pos_y = component[3]
+            cell = self.getComponentByAddress(Cell._getCellAddress(row, column))
+            cell._setSelected(True)
         else:
             raise Exception ("Invalid selection")
 
@@ -354,6 +417,8 @@ class PlateManipulator(SampleChanger):
             drop_index = int(pos_y * (self.num_drops + 1))
             self.current_location = [row, col, pos_x, pos_y]
             self._onStateChanged('Ready')
+            self._updateLoadedSample()
+            
 
     def _doUpdateInfo(self):
         """
@@ -361,13 +426,14 @@ class PlateManipulator(SampleChanger):
         """
         #self._updateState()
         #Remove if callback works
-        self._updateLoadedSample()
+        #self._updateLoadedSample()
 
     def _updateLoadedSample(self):
         """
         Descript. : function to update plate location. It is called by 1 sec
                     timer. 
         """
+
         if self.current_location is not None:
             row = self.current_location[0]
             col = self.current_location[1]
@@ -391,14 +457,15 @@ class PlateManipulator(SampleChanger):
 
     def getSampleList(self):
         """
-        Descript. :
+        Descript. : This is ugly
         """
         sample_list = []
-        for c in self.getComponents():
-            if isinstance(c, Cell):
-                for drop in c.getComponents():
-                    #sample_list.append(drop)
-                    sample_list.append(drop.getSample())
+        for basket in self.getComponents():
+            if isinstance(basket, Basket):
+                for cell in basket.getComponents():
+                    if isinstance(cell, Cell):
+                       for drop in cell.getComponents():
+                           sample_list.append(drop.getSample())
         return sample_list
 
     def get_plate_info(self):
