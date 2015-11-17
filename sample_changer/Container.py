@@ -51,8 +51,6 @@ class Container(Component):
                 samples.extend(c.getSampleList())
         return samples
 
-<<<<<<< HEAD
-=======
     def getBasketList(self):
         basket_list = []
         for basket in self.components:
@@ -60,7 +58,6 @@ class Container(Component):
                 basket_list.append(basket)
         return basket_list
 
->>>>>>> origin/master
     def getPresentSamples(self):
         """
         Returns the list of all Sample objects under of this container (recursivelly) tagged as present
@@ -177,8 +174,6 @@ class Container(Component):
             for c in self.getComponents():
                 c._setSelected(False)        
         Component._setSelected(self, selected)
-<<<<<<< HEAD
-=======
 
 class Basket(Container):
     __TYPE__ = "Puck"
@@ -216,5 +211,4 @@ class Pin(Sample):
     @staticmethod
     def getSampleAddress(basket_number, sample_number):
         return str(basket_number) + ":" + "%02d" % (sample_number)
->>>>>>> origin/master
         
