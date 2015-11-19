@@ -244,18 +244,11 @@ class Sample(TaskNode):
     def init_from_sc_sample(self, sc_sample):
         self.loc_str = str(sc_sample[1]) + ':' + str(sc_sample[2])
         self.location = (sc_sample[1], sc_sample[2])
-        self.set_name(self.loc_str)
-
-    def init_from_plate_sample(self, plate_sample):
-        """
-        Descript. : location : col, row, index
-        """
-        self.loc_str = "%s:%s:%s" %(chr(65 + int(plate_sample[1])),
-                                    str(plate_sample[2]),
-                                    str(plate_sample[3]))
-        self.location = (int(plate_sample[1]), int(plate_sample[2]), int(plate_sample[3]))
-        self.location_plate = plate_sample[5]
-        self.set_name(self.loc_str)
+        if len(sc_sample) > 3:
+            self.set_name(sc_sample[3])
+            self.location_plate = sc_sample[3]
+        else:
+            self.set_name(self.loc_str)
 
     def init_from_lims_object(self, lims_sample):
         if hasattr(lims_sample, 'cellA'):
@@ -359,7 +352,7 @@ class Basket(TaskNode):
     def is_present(self):
         return self.get_is_present()
 
-    def init_from_sc_basket(self, sc_basket, name="Basket"):
+    def init_from_sc_basket(self, sc_basket):
         """
         TODO Agree on a correct method
         self._basket_object = sc_basket[1] #self.is_present = sc_basket[2]
@@ -370,8 +363,9 @@ class Basket(TaskNode):
             self.name = "Puck %d" % self.location 
         """
         self.location = int(sc_basket[0])
+        name = sc_basket[2]
         if name == "Row":
-            self.name = "%s %s" % (name, chr(65 + self.location))
+            self.name = "%s %s" % (name, chr(65 + self.location - 1))
         else:
             self.name = "%s %d" % (name, self.location)
         self._basket_object = sc_basket[1]
@@ -924,10 +918,53 @@ class XRFScanResult(object):
         self.mca_calib = None
         self.mca_config = None
 
-class AdvancedScan(TaskNode):
-    def __init__(self, acquisition_list=None, crystal=None,
-                 processing_parameters=None, name=''):
+class Advanced(TaskNode):
+    def __init__(self, method_type=None, ref_data_collection=None, grid_object=None,
+                 crystal=None):
         TaskNode.__init__(self)
+
+        self.method_type = method_type
+        self.set_requires_centring(False)
+
+        if not ref_data_collection:
+            ref_data_collection = DataCollection()
+
+        if not crystal:
+            crystal = Crystal()
+
+        self.reference_image_collection = ref_data_collection
+        self.crystal = crystal
+        self.grid_object = grid_object
+
+        self.html_report = None
+        self.first_processing_results = None
+        self.second_processing_results = None
+
+    def get_associated_grid(self):
+        return self.grid_object
+
+    def get_path_template(self):
+        return self.reference_image_collection.acquisitions[0].\
+               path_template
+
+    def get_files_to_be_written(self):
+        path_template = self.reference_image_collection.acquisitions[0].\
+                        path_template
+
+        file_locations = path_template.get_files_to_be_written()
+
+        return file_locations
+
+    def get_display_name(self):
+        name = self.method_type
+        if self.grid_object:
+            name += " (%s)" % self.grid_object.get_display_name()
+        else:
+            name += " (Static grid)"
+        return name
+
+    def get_processing_results(self):
+        return self.first_processing_results
 
 class SampleCentring(TaskNode):
     def __init__(self, name = None, kappa = None, kappa_phi = None):
@@ -937,9 +974,6 @@ class SampleCentring(TaskNode):
         if name:
             self.set_name(name)
  
-        self.kappa = kappa
-        self.kappa_phi = kappa_phi
-
         self.kappa = kappa
         self.kappa_phi = kappa_phi 
 
@@ -1157,7 +1191,6 @@ class AcquisitionParameters(object):
         self.skip_existing_images = False
         self.detector_mode = int()
         self.induce_burn = False
-        self.mesh_steps = int()
         self.mesh_range = ()        
         self.mesh_snapshot = None
         self.comments = ""
@@ -1196,6 +1229,7 @@ class CentredPosition(object):
         self.snapshot_image = None
         self.centring_method = True
         self.index = None
+        self.used_for_collection = 0
 
         for motor_name in CentredPosition.DIFFRACTOMETER_MOTOR_NAMES:
            setattr(self, motor_name, None)
@@ -1207,6 +1241,12 @@ class CentredPosition(object):
     def as_dict(self):
         return dict(zip(CentredPosition.DIFFRACTOMETER_MOTOR_NAMES,
                     [getattr(self, motor_name) for motor_name in CentredPosition.DIFFRACTOMETER_MOTOR_NAMES]))
+
+    def as_str(self):
+        motor_str = ""
+        for motor_name in CentredPosition.DIFFRACTOMETER_MOTOR_NAMES:
+            motor_str += "%s: %.3f " %(motor_name, abs(getattr(self, motor_name)))
+        return motor_str
 
     def __repr__(self):
         return str(self.as_dict())
@@ -1237,7 +1277,6 @@ class CentredPosition(object):
 
     def get_kappa_phi_value(self):
         return self.kappa_phi
-
 
 class Workflow(TaskNode):
     def __init__(self):
@@ -1307,6 +1346,8 @@ def to_collect_dict(data_collection, session, sample, centred_pos=None):
              'fileinfo': {'directory': acquisition.path_template.directory,
                           'prefix': acquisition.path_template.get_prefix(),
                           'run_number': acquisition.path_template.run_number,
+                          'archive_directory' : acquisition.\
+                          path_template.get_archive_directory(),
                           'process_directory': acquisition.\
                           path_template.process_directory},
              'in_queue': acq_params.in_queue,
