@@ -315,7 +315,7 @@ class Qt4_GraphicsManager(HardwareObject):
     def mouse_clicked(self, x, y, left_click=True):
         """
         Descript. :
-        """ 
+        """
         if self.in_centring_state:
             self.graphics_centring_lines_item.set_start_position(x, y)
             self.diffractometer_hwobj.image_clicked(x, y)
@@ -324,24 +324,24 @@ class Qt4_GraphicsManager(HardwareObject):
             self.graphics_grid_draw_item.set_draw_mode(True)
             self.graphics_grid_draw_item.set_draw_start_position(x, y)
             self.graphics_grid_draw_item.show()
-        elif self.in_measure_distance_state:
-            QtGui.QApplication.restoreOverrideCursor()
-            self.in_measure_distance_state = False
-        elif self.in_measure_angle_state:
-            self.in_measure_angle_state = self.graphics_measure_angle_item.store_coord()
-            if not self.in_measure_angle_state:
-                QtGui.QApplication.restoreOverrideCursor()
-        elif self.in_measure_area_state:
-            self.graphics_measure_area_item.store_coord()
         elif self.wait_measure_distance_click:
             self.start_graphics_item(self.graphics_measure_distance_item)
             self.in_measure_distance_state = True
+            self.wait_measure_distance_click = False
         elif self.wait_measure_angle_click:
             self.start_graphics_item(self.graphics_measure_angle_item)
             self.in_measure_angle_state = True
+            self.wait_measure_angle_click = False
         elif self.wait_measure_area_click:
             self.start_graphics_item(self.graphics_measure_area_item)
             self.in_measure_area_state = True
+            self.wait_measure_area_click = False
+        elif self.in_measure_distance_state:
+            self.graphics_measure_distance_item.store_coord(x, y)
+        elif self.in_measure_angle_state:
+            self.graphics_measure_angle_item.store_coord(x, y)
+        elif self.in_measure_area_state:
+            self.graphics_measure_area_item.store_coord()
         elif self.in_move_beam_mark_state:
             self.stop_move_beam_mark()
         else:
@@ -350,10 +350,6 @@ class Qt4_GraphicsManager(HardwareObject):
                 self.graphics_select_tool_item.set_end_position(x, y)
                 self.graphics_select_tool_item.show()
                 self.in_select_items_state = True
-
-                self.stop_measure_distance()
-                self.stop_measure_angle()
-                self.stop_measure_area()
             for graphics_item in self.graphics_view.scene().items():
                 graphics_item.setSelected(False)
                 if type(graphics_item) in [GraphicsItemPoint, GraphicsItemLine, GraphicsItemGrid]:
@@ -363,10 +359,12 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """
-        if self.in_measure_area_state:
-            QtGui.QApplication.restoreOverrideCursor()  
-            self.in_measure_area_state = False
-            self.graphics_measure_area_item.store_coord(last=True)
+        if self.in_measure_distance_state:
+            self.stop_measure_distance()
+        elif self.in_measure_angle_state:
+            self.stop_measure_angle()
+        elif self.in_measure_area_state:
+            self.stop_measure_area()
         else: 
             self.diffractometer_hwobj.move_to_coord(x, y)
 
@@ -400,8 +398,7 @@ class Qt4_GraphicsManager(HardwareObject):
             if self.graphics_grid_draw_item.is_draw_mode():
                 self.graphics_grid_draw_item.set_draw_end_position(x, y)
         elif self.in_measure_distance_state:
-            self.graphics_measure_distance_item.set_end_position(\
-                self.mouse_position[0], self.mouse_position[1])
+            self.graphics_measure_distance_item.set_coord(self.mouse_position)
         elif self.in_measure_angle_state:
             self.graphics_measure_angle_item.set_coord(self.mouse_position)
         elif self.in_measure_area_state:
@@ -432,6 +429,10 @@ class Qt4_GraphicsManager(HardwareObject):
             for item in self.graphics_view.graphics_scene.items():
                 if item.isSelected():
                     self.delete_shape(item)
+        elif key_event == "Escape":
+            self.stop_measure_distance()
+            self.stop_measure_angle()
+            self.stop_measure_area()  
  
     def item_clicked(self, item, state):
         """
@@ -661,13 +662,11 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """ 
-        self.stop_measure_angle()
-        self.stop_measure_area()
-
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.BusyCursor))
         self.emit('measureDistanceStateChanged', True)
         if wait_click:
-            logging.getLogger("user_level_log").info("Click to start distance measuring") 
+            logging.getLogger("user_level_log").info("Click to start " + \
+                    "distance  measuring (Double click stops)")  
             self.wait_measure_distance_click = True
         else:
             self.wait_measure_distance_click = False
@@ -678,13 +677,11 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """
-        self.stop_measure_distance()
-        self.stop_measure_area()
-
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.BusyCursor))
         self.emit('measureAngleStateChanged', True)
         if wait_click:
-            logging.getLogger("user_level_log").info("Click to start angle measuring")
+            logging.getLogger("user_level_log").info("Click to start " + \
+                 "angle measuring (Double click stops)")
             self.wait_measure_angle_click = True
         else:
             self.wait_measure_angle_click = False
@@ -695,13 +692,11 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """
-        self.stop_measure_distance()
-        self.stop_measure_angle()
-
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.BusyCursor))
         self.emit('measureAreaStateChanged', True)
         if wait_click:
-            logging.getLogger("user_level_log").info("Click to start area measuring")
+            logging.getLogger("user_level_log").info("Click to start area " + \
+                    "measuring (Double click stops)")
             self.wait_measure_area_click = True
         else:
             self.wait_measure_area_click = False
@@ -712,10 +707,6 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """
-        self.stop_measure_distance()
-        self.stop_measure_angle()
-        self.stop_measure_area()
-
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.BusyCursor))
         self.emit('moveBeamMarkStateChanged', True)
         self.in_move_beam_mark_state = True
@@ -764,6 +755,7 @@ class Qt4_GraphicsManager(HardwareObject):
         """
         Descript. :
         """
+        QtGui.QApplication.restoreOverrideCursor()
         self.in_measure_area_state = False
         self.wait_measure_area_click = False
         self.graphics_measure_area_item.hide()
@@ -1388,31 +1380,40 @@ class GraphicsItemGrid(GraphicsItem):
             cell_index = 0
             if self.__num_cols * self.__num_rows < 1000 and self.__cell_size_pix[1] > 20:
                 for col in range(self.__num_cols):
-                    coll_offset = col * self.__cell_size_pix[0]
                     for row in range(self.__num_rows):
-                        row_offset = row * self.__cell_size_pix[1]
-                        if self.__beam_is_rectangle:
-                            painter.drawRect(draw_start_x + coll_offset + self.__spacing_pix[0],
-                                             draw_start_y + row_offset + self.__spacing_pix[1],
-                                             self.__beam_size_pix[0], self.__beam_size_pix[1])
-                        else:
-                            painter.drawEllipse(draw_start_x + coll_offset + self.__spacing_pix[0],
-                                                draw_start_y + row_offset + self.__spacing_pix[1],
-                                                self.__beam_size_pix[0], self.__beam_size_pix[1])
-                for col in range(self.__num_cols):
-                    for row in range(self.__num_rows):
+                        #Estimate area where frame number or score will be displayed
                         line, image = self.get_line_image_num(cell_index + self.__first_image_num)
                         x, y = self.get_coord_from_line_image(line, image)
                         tr = QtCore.QRect(x - self.__cell_size_pix[0] / 2, 
                                           y - self.__cell_size_pix[1] / 2,
                                           self.__cell_size_pix[0], 
                                           self.__cell_size_pix[1])
+                        #If score exists overlay color may change
                         if self.__score is not None:
-                            painter.drawText(tr, QtCore.Qt.AlignCenter, "%0.3f" % \
-                                    self.__score[cell_index - 1])
+                            score = self.__score[cell_index - 1]
+                            painter.drawText(tr, QtCore.Qt.AlignCenter, "%0.1f" % score)
+                            if self.__score.max() > 0:
+                                score = score / self.__score.max() 
+                            if score > 0:
+                                brush_color = QtGui.QColor()
+                                brush_color.setHsv(60 - 60 * score, 255, 255 * score, 100)
+                                brush.setColor(brush_color)
+                                painter.setBrush(brush)
+                            else: 
+                                painter.setBrush(QtCore.Qt.transparent)     
                         else:
                             painter.drawText(tr, QtCore.Qt.AlignCenter, \
                                     str(cell_index + self.__first_image_num))
+                        if self.__beam_is_rectangle:
+                            painter.drawRect(x - self.__beam_size_pix[0] / 2,
+                                             y - self.__beam_size_pix[1] / 2,
+                                             self.__beam_size_pix[0], 
+                                             self.__beam_size_pix[1])
+                        else:
+                            painter.drawEllipse(x - self.__beam_size_pix[0] / 2,
+                                                y - self.__beam_size_pix[1] / 2,
+                                                self.__beam_size_pix[0], 
+                                                self.__beam_size_pix[1])
                         cell_index += 1
             painter.drawText(self.__center_coord[0] + self.__grid_size_pix[0] / 2 + 3,
                              self.__center_coord[1] - self.__grid_size_pix[1] / 2 - 3,
@@ -1699,27 +1700,6 @@ class GraphicsItemCentringLines(GraphicsItem):
         painter.drawLine(0, self.start_coord[1],
                          self.scene().width(), self.start_coord[1])
 
-class GraphicsItemMeasureDistance(GraphicsItem):
-    """
-    Descrip. : 
-    """
-    def __init__(self, parent):
-        GraphicsItem.__init__(self, parent)
-        self.setFlags(QtGui.QGraphicsItem.ItemIsSelectable)
-
-    def paint(self, painter, option, widget):
-        pen = QtGui.QPen(self.solid_line_style)
-        pen.setWidth(1)
-        pen.setColor(QtCore.Qt.green)
-        painter.setPen(pen)
-        dist_microns = math.sqrt(pow((self.start_coord[0] - self.end_coord[0]) / \
-            self.pixels_per_mm[0], 2) + pow((self.start_coord[1] - self.end_coord[1]) / \
-            self.pixels_per_mm[1], 2)) * 1000
-
-        painter.drawLine(self.start_coord[0], self.start_coord[1],
-                         self.end_coord[0], self.end_coord[1])
-        painter.drawText(self.end_coord[0] + 15, self.end_coord[1] + 10,
-                         "%.2f %s" % (dist_microns, u"\u00B5"))
 
 class GraphicsItemMoveBeamMark(GraphicsItem):
     """
@@ -1746,6 +1726,50 @@ class GraphicsItemMoveBeamMark(GraphicsItem):
             painter.drawEllipse(self.end_coord[0] - self.__beam_size_pix[0] / 2,
                                 self.end_coord[1] - self.__beam_size_pix[1] / 2,
                                 self.__beam_size_pix[0], self.__beam_size_pix[1])
+
+
+class GraphicsItemMeasureDistance(GraphicsItem):
+    """
+    Descrip. : 
+    """
+    def __init__(self, parent):
+        GraphicsItem.__init__(self, parent)
+        self.setFlags(QtGui.QGraphicsItem.ItemIsSelectable)
+        self.do_measure = None
+        self.measure_points = None
+        self.measured_distance = None
+
+    def paint(self, painter, option, widget):
+        pen = QtGui.QPen(self.solid_line_style)
+        pen.setWidth(1)
+        pen.setColor(QtCore.Qt.green)
+        painter.setPen(pen)
+        painter.drawLine(self.measure_points[0], self.measure_points[1])
+        painter.drawText(self.measure_points[1].x() + 15, 
+                         self.measure_points[1].y() + 10,
+                         "%.2f %s" % (self.measured_distance, u"\u00B5"))
+ 
+    def set_start_position(self, position_x, position_y):
+        self.measured_distance = 0
+        self.measure_points = []
+        self.measure_points.append(QtCore.QPoint(position_x, position_y))
+        self.measure_points.append(QtCore.QPoint(position_x, position_y))
+ 
+    def set_coord(self, coord):
+        self.measure_points[len(self.measure_points) - 1].setX(coord[0])
+        self.measure_points[len(self.measure_points) - 1].setY(coord[1])
+        if len(self.measure_points) == 2:
+            self.measured_distance = math.sqrt(pow((self.measure_points[0].x() - 
+                self.measure_points[1].x()) / self.pixels_per_mm[0], 2) + \
+                pow((self.measure_points[0].y() - self.measure_points[1].y()) / \
+                self.pixels_per_mm[1], 2)) * 1000
+            self.scene().update()
+
+    def store_coord(self, position_x, position_y):
+        if len(self.measure_points) == 3:
+            self.measure_points = []
+            self.measure_points.append(QtCore.QPoint(position_x, position_y))
+        self.measure_points.append(QtCore.QPoint(position_x, position_y)) 
  
 class GraphicsItemMeasureAngle(GraphicsItem):
     """
@@ -1754,7 +1778,6 @@ class GraphicsItemMeasureAngle(GraphicsItem):
     def __init__(self, parent):
         GraphicsItem.__init__(self, parent)
         self.measure_points = None
-        self.current_measure_point = None
         self.measured_angle = None
         self.setFlags(QtGui.QGraphicsItem.ItemIsSelectable)
 
@@ -1764,37 +1787,36 @@ class GraphicsItemMeasureAngle(GraphicsItem):
         pen.setColor(QtCore.Qt.green)
         painter.setPen(pen)
         if len(self.measure_points) > 1:
-             painter.drawLine(self.measure_points[0][0], self.measure_points[0][1],
-                              self.measure_points[1][0], self.measure_points[1][1])
+             painter.drawLine(self.measure_points[0], self.measure_points[1])
              if len(self.measure_points) > 2:
-                 painter.drawLine(self.measure_points[1][0], self.measure_points[1][1],
-                                  self.measure_points[2][0], self.measure_points[2][1])
-                 painter.drawText(self.measure_points[2][0] + 10, 
-                                  self.measure_points[2][1] + 10, 
+                 painter.drawLine(self.measure_points[1],
+                                  self.measure_points[2])
+                 painter.drawText(self.measure_points[2].x() + 10,
+                                  self.measure_points[2].y() + 10, 
                                   "%.2f %s" % (self.measured_angle, u"\u00B0"))
 
     def set_start_position(self, position_x, position_y):
         self.measured_angle = 0
         self.measure_points = []
-        self.measure_points.append([position_x, position_y])
-        self.measure_points.append([position_x, position_y])
-        self.current_measure_point = 1
+        self.measure_points.append(QtCore.QPoint(position_x, position_y))
+        self.measure_points.append(QtCore.QPoint(position_x, position_y))
 
     def set_coord(self, coord):
-        self.measure_points[len(self.measure_points) - 1][0] = coord[0]
-        self.measure_points[len(self.measure_points) - 1][1] = coord[1]
+        self.measure_points[len(self.measure_points) - 1].setX(coord[0])
+        self.measure_points[len(self.measure_points) - 1].setY(coord[1])
         if len(self.measure_points) == 3: 
-            self.measured_angle = - math.degrees(math.atan2(self.measure_points[2][1] - \
-                 self.measure_points[1][1], self.measure_points[2][0] - \
-                 self.measure_points[1][0]) - math.atan2(self.measure_points[0][1] - \
-                 self.measure_points[1][1], self.measure_points[0][0] - \
-                 self.measure_points[1][0]))
-        self.scene().update()
+            self.measured_angle = - math.degrees(math.atan2(self.measure_points[2].y() - \
+                 self.measure_points[1].y(), self.measure_points[2].x() - \
+                 self.measure_points[1].x()) - math.atan2(self.measure_points[0].y() - \
+                 self.measure_points[1].y(), self.measure_points[0].x() - \
+                 self.measure_points[1].x()))
+            self.scene().update()
 
-    def store_coord(self):
-        self.measure_points.append([self.measure_points[len(self.measure_points) - 1][0],
-                                    self.measure_points[len(self.measure_points) - 1][1]])
-        return not len(self.measure_points) > 3        
+    def store_coord(self, position_x, position_y):
+        if len(self.measure_points) == 4:
+            self.measure_points = []
+            self.measure_points.append(QtCore.QPoint(position_x, position_y))        
+        self.measure_points.append(QtCore.QPoint(position_x, position_y))
 
 class GraphicsItemMeasureArea(GraphicsItem):
     """
@@ -1835,7 +1857,7 @@ class GraphicsItemMeasureArea(GraphicsItem):
                        self.pixels_per_mm[0] * 1000
             ver_size = abs(self.min_max_coord[0][1] - self.min_max_coord[1][1]) /\
                        self.pixels_per_mm[1] * 1000
-            painter.drawLine(self.min_max_coord[0][0] - 10,
+            painter.drawLine(self.min_max_coord[0][0] - 10, 
                              self.min_max_coord[0][1],
                              self.min_max_coord[0][0] - 10,
                              self.min_max_coord[1][1])
@@ -1862,18 +1884,6 @@ class GraphicsItemMeasureArea(GraphicsItem):
         if not self.last_point_set:
             self.current_point.setX(coord[0])
             self.current_point.setY(coord[1])
-            self.measured_area = 0
-            if self.measure_polygon.count() > 2:
-                for point_index in range(self.measure_polygon.count() - 1):
-                    self.measured_area += self.measure_polygon.value(point_index).x() * \
-                                          self.measure_polygon.value(point_index + 1).y()
-                    self.measured_area -= self.measure_polygon.value(point_index).y() * \
-                                          self.measure_polygon.value(point_index + 1).x()
-                self.measured_area += self.measure_polygon.value(len(self.measure_polygon) - 1).x() * \
-                                      self.measure_polygon.value(0).y()
-                self.measured_area -= self.measure_polygon.value(len(self.measure_polygon) - 1).y() * \
-                                      self.measure_polygon.value(0).x() 
-                self.measured_area /= self.pixels_per_mm[0] * self.pixels_per_mm[1]
             self.scene().update()
 
     def store_coord(self, last = None):
@@ -1893,6 +1903,19 @@ class GraphicsItemMeasureArea(GraphicsItem):
                 self.min_max_coord[0][1] = self.measure_polygon.value(point_index).y()
             elif self.measure_polygon.value(point_index).y() > self.min_max_coord[1][1]: 
                 self.min_max_coord[1][1] = self.measure_polygon.value(point_index).y()
+        if self.measure_polygon.count() > 2:
+            self.measured_area = 0
+            for point_index in range(self.measure_polygon.count() - 1):
+                self.measured_area += self.measure_polygon.value(point_index).x() * \
+                                      self.measure_polygon.value(point_index + 1).y()
+                self.measured_area -= self.measure_polygon.value(point_index + 1).x() * \
+                                      self.measure_polygon.value(point_index).y()
+            self.measured_area += self.measure_polygon.value(len(self.measure_polygon) - 1).x() * \
+                                  self.measure_polygon.value(0).y()
+            self.measured_area -= self.measure_polygon.value(0).x() * \
+                                  self.measure_polygon.value(len(self.measure_polygon) - 1).y()
+            self.measured_area = abs(self.measured_area / (2 * self.pixels_per_mm[0] * \
+                                 self.pixels_per_mm[1]) * 1e6)
         self.scene().update()
 
 
@@ -1917,8 +1940,10 @@ class GraphicsView(QtGui.QGraphicsView):
  
     def keyPressEvent(self, event):
         key_type = None
-        if event.key() in(QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):  
+        if event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):  
             key_type = "Delete"
+        elif event.key() == QtCore.Qt.Key_Escape:
+            key_type = "Escape"
         if key_type:
             self.keyPressedSignal.emit(key_type)
 
