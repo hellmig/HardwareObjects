@@ -17,13 +17,15 @@ class MicrodiffMotor(AbstractMotor, Device):
     def init(self): 
         self.position = -1e3
         self.old_position = -1e3
-
+        #assign value to motor_name
         self.motor_name = self.getProperty("motor_name")
  
         self.motor_resolution = self.getProperty("resolution")
         if self.motor_resolution is None:
            self.motor_resolution = 0.0001
 
+        # this is ugly : I added it to make the centring procedure happy
+        self.specName = self.motor_name
 
         self.motorState = MicrodiffMotor.NOTINITIALIZED
 

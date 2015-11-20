@@ -352,23 +352,20 @@ class Basket(TaskNode):
     def is_present(self):
         return self.get_is_present()
 
-    def init_from_sc_basket(self, sc_basket):
-        """
-        TODO Agree on a correct method
+    def init_from_sc_basket(self, sc_basket,name="Basket"):
+	# use 2.1 version
         self._basket_object = sc_basket[1] #self.is_present = sc_basket[2]
-        self.location = self._basket_object.getCoords() #sc_basket[0]
-        if len(self.location) == 2:
-            self.name = "Cell %d, puck %d" % self.location
+        if self._basket_object is None:
+            self.location = sc_basket[0]
+            if name == "Row":
+                self.name = "%s %s" % (name, chr(65 + self.location))
+            else:
+                self.name = "%s %d" % (name, self.location)
         else:
-            self.name = "Puck %d" % self.location 
-        """
-        self.location = int(sc_basket[0])
-        name = sc_basket[2]
-        if name == "Row":
-            self.name = "%s %s" % (name, chr(65 + self.location - 1))
-        else:
-            self.name = "%s %d" % (name, self.location)
-        self._basket_object = sc_basket[1]
+            self.location = self._basket_object.getCoords()
+            self.name = "%s %d" % (name, self.location[0])
+            if len(self.location) == 2:
+                self.name = "Cell %d, puck %d" % self.location
 
     def get_name(self):
         return self.name

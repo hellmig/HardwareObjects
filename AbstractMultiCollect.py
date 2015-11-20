@@ -10,6 +10,7 @@ import gevent
 import autoprocessing
 import gevent
 from HardwareRepository.TaskUtils import *
+
 BeamlineControl = collections.namedtuple('BeamlineControl',
                                          ['diffractometer',
                                           'sample_changer',
@@ -38,8 +39,8 @@ BeamlineConfig = collections.namedtuple('BeamlineConfig',
                                          'detector_px',
                                          'detector_py',
                                          'undulators',
-                                         'focusing_optic',
-                                         'monochromator_type',
+                                         'focusing_optic', 
+                                         'monochromator_type', 
                                          'beam_divergence_vertical',
                                          'beam_divergence_horizontal',
                                          'polarisation',
@@ -421,7 +422,7 @@ class AbstractMultiCollect(object):
         file_parameters = data_collect_parameters["fileinfo"]
 
         file_parameters["suffix"] = self.bl_config.detector_fileext
-        image_file_template = self.image_file_format % file_parameters
+        image_file_template = "%(prefix)s_%(run_number)s_%%04d.%(suffix)s" % file_parameters
         file_parameters["template"] = image_file_template
 
         archive_directory = self.get_archive_directory(file_parameters["directory"])
@@ -444,6 +445,7 @@ class AbstractMultiCollect(object):
                 data_collect_parameters["synchrotronMode"] = self.get_machine_fill_mode()
             data_collect_parameters["status"] = "failed"
 
+            logging.getLogger("user_level_log").info("Storing data collection in LIMS")
             (self.collection_id, detector_id) = \
                                  self.bl_control.lims.store_data_collection(data_collect_parameters, self.bl_config)
               
@@ -469,6 +471,7 @@ class AbstractMultiCollect(object):
                 data_collect_parameters["actualContainerBarcode"] = \
                     self.bl_control.sample_changer.getLoadedSample().getContainer().getID()
 
+                logging.getLogger("user_level_log").info("Getting loaded sample coords")
                 basket, vial = self.bl_control.sample_changer.getLoadedSample().getCoords()
 
                 data_collect_parameters["actualSampleSlotInContainer"] = vial
@@ -509,14 +512,6 @@ class AbstractMultiCollect(object):
         # this is for the LIMS
         positions_str += " ".join([motor+("=%f" % pos) for motor, pos in motors_to_move_before_collect.iteritems()])
         data_collect_parameters['actualCenteringPosition'] = positions_str
-        ###
-        self.move_motors(motors_to_move_before_collect)
-
-        # take snapshots, then assign centring status (which contains images) to centring_info variable
-        self._take_crystal_snapshots(data_collect_parameters.get("take_snapshots", False))
-        centring_info = self.bl_control.diffractometer.getCentringStatus()
-        # move *again* motors, since taking snapshots may change positions
-        self.move_motors(motors_to_move_before_collect)
 
         self.move_motors(motors_to_move_before_collect)
         # take snapshots, then assign centring status (which contains images) to centring_info variable
@@ -567,8 +562,6 @@ class AbstractMultiCollect(object):
                     f.close()
                   except:
                     pass
-                else:
-                  f.close()
 
                 data_collect_parameters['xtalSnapshotFullPath%i' % snapshot_i] = full_snapshot
 

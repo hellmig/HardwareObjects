@@ -136,6 +136,8 @@ class AbstractEnergyScan(object):
         set the nesessary equipment in position after the scan
         """
         pass
+    
+    @abc.abstractmethod          
     #def do_energy_scan(self, energy_scan_parameters):
     def startEnergyScan(self,element,edge,directory,prefix,session_id=None,blsample_id=None):
 

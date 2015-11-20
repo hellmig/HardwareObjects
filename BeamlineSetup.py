@@ -299,7 +299,6 @@ class BeamlineSetup(HardwareObject):
         acq_parameters.skip_existing_images = False
         acq_parameters.take_snapshots = True
 
-
         return acq_parameters
 
     def get_acquisition_limit_values(self):

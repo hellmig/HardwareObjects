@@ -74,7 +74,6 @@ class Session(HardwareObject):
         user_category = ''
         directory = ''
 
-
         if self.synchrotron_name == "PETRA":
             start_time = time.strftime("%Y%m%d")
             if os.getenv("SUDO_USER"):

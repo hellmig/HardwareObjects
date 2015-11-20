@@ -240,12 +240,11 @@ class MiniDiff(Equipment):
             self.connect(self.lightWago, 'wagoStateChanged', self.wagoLightStateChanged)
         else:
             logging.getLogger("HWR").warning('MiniDiff: wago light is not defined in minidiff equipment %s', str(self.name()))
-
         if self.aperture is not None:
             self.connect(self.aperture, 'predefinedPositionChanged', self.apertureChanged)
             self.connect(self.aperture, 'positionReached', self.apertureChanged)
 
-        #Agree on a correct method name
+        #Agree on a correct method name, inconsistent arguments for moveToBeam, disabled temporarily
         #self.move_to_coord = self.moveToBeam()
 
     def save_snapshot(self, filename):
@@ -381,7 +380,7 @@ class MiniDiff(Equipment):
     def getBeamPosY(self):
         return self.imgHeight / 2
 
-    def moveToBeam(self,x,y):
+    def moveToBeam(self, x, y):
         try:
             beam_xc = self.getBeamPosX()
             beam_yc = self.getBeamPosY()
