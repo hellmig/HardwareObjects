@@ -17,6 +17,8 @@ class MicrodiffMotor(AbstractMotor, Device):
     def init(self): 
         self.position = -1e3
         self.old_position = -1e3
+        #assign value to motor_name
+        self.motor_name = self.getProperty("motor_name")
  
         self.motor_resolution = self.getProperty("resolution")
         if self.motor_resolution is None:
