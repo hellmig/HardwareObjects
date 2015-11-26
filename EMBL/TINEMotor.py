@@ -53,6 +53,7 @@ class TINEMotor(Device):
         self.motorState2 = 'noninit'
         self.limits = None
         self.staticLimits = None
+        self.current_position = None
         self.previousPosition = None
         self.static_limits = None
 
@@ -73,6 +74,7 @@ class TINEMotor(Device):
         """
         Descript. :
         """
+        self.current_position = -10.0
         self.previousPosition = -10.0
 
         self.chan_position = self.getChannelObject('axisPosition')
@@ -238,9 +240,10 @@ class TINEMotor(Device):
         """
         Descript. :
         """
-        position = self.getPosition()
+        position = self.getPosition()    
         if (self.epsilon is None) or (abs(float(position) - float(self.previousPosition)) > float(self.epsilon)) : 
             self.emit('positionChanged', (position, ))
+            self.current_position = position
             if (self.verboseUpdate == True):
                 logging.getLogger().debug('Updating motor postion %s to %s from %s ' \
                   %(self.objName, position, self.previousPosition))
@@ -275,4 +278,7 @@ class TINEMotor(Device):
             if (conditions[cond] != eval("self.%s" % cond)):
                 return False
         return True
-    
+
+    def update_values(self):    
+        self.emit('limitsChanged', (self.limits, ))
+        self.emit('positionChanged', (self.current_position, ))
