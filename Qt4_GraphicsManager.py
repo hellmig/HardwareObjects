@@ -372,7 +372,7 @@ class Qt4_GraphicsManager(HardwareObject):
                 graphics_item.setSelected(False)
                 if type(graphics_item) in [GraphicsItemPoint, GraphicsItemLine, GraphicsItemGrid]:
                     self.emit("shapeSelected", graphics_item, False)  
-            #self.emit("pointSelected", None)
+            self.emit("pointSelected", None)
             self.emit("infoMsg", "")
 
     def mouse_double_clicked(self, x, y):
@@ -472,7 +472,7 @@ class Qt4_GraphicsManager(HardwareObject):
         """ 
         if isinstance(item, GraphicsItemPoint):
             self.diffractometer_hwobj.move_to_centred_position(\
-                 item.get_centred_positions()[0])
+                 item.get_centred_position())
 
     def get_graphics_view(self):
         """
@@ -677,7 +677,7 @@ class Qt4_GraphicsManager(HardwareObject):
         image_painter.end()
         return image
 
-    def take_scene_snapshots(self, file_name):
+    def save_snapshot(self, file_name):
         logging.getLogger("user_level_log").info("Saving snapshot in %s" % file_name)
         snapshot = self.get_snapshot()
         snapshot.save(file_name)
@@ -1596,7 +1596,7 @@ class GraphicsItemGrid(GraphicsItem):
                  image in line from col and row
                  col and row can be floats
         """
-        image = int(self.__num_images_per_line / 2.0 - \
+        image = int(self.__num_images_per_line / 2.0 + \
                     (self.grid_direction['fast'][0] * \
                     (self.__num_images_per_line / 2.0 - col) + \
                      self.grid_direction['fast'][1] * \
