@@ -46,6 +46,8 @@ class BeamInfo(Equipment):
         self.chan_beam_size_microns = None
         self.chan_beam_shape_ellipse = None
 
+        self.chan_beam_size_microns = None
+        self.chan_beam_shape_ellipse = None
 
     def init(self):
         """
@@ -77,9 +79,20 @@ class BeamInfo(Equipment):
         else:
             logging.getLogger("HWR").debug("BeamInfo: Beam definer hwobj not defined")
 
-        default_beam_divergence_vertical = int(self.getProperty("beam_divergence_vertical"))
-        default_beam_divergence_horizontal = int(self.getProperty("beam_divergence_horizontal"))
+        default_beam_divergence_vertical = None
+        default_beam_divergence_horizontal = None
+        try: 
+           default_beam_divergence_vertical = int(self.getProperty("beam_divergence_vertical"))
+           default_beam_divergence_horizontal = int(self.getProperty("beam_divergence_horizontal"))
+        except:
+           pass
         self.default_beam_divergence = [default_beam_divergence_horizontal, default_beam_divergence_vertical]
+
+        self.beam_size_aperture = [0.01, 0.01]
+
+    def connectNotify(self, *args):
+        self.evaluate_beam_info()
+        self.emit_beam_info_change()
 
     def get_beam_divergence_hor(self):
         """
@@ -105,7 +118,8 @@ class BeamInfo(Equipment):
         Arguments :
         Return    :
         """
-        raise NotImplementedError
+        return (0, 0)
+        #raise NotImplementedError
 
     def set_beam_position(self, beam_x, beam_y):
         """

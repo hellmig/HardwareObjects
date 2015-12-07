@@ -1,6 +1,9 @@
 import gevent
 from gevent.event import AsyncResult
-from Qub.Tools import QubImageSave
+try:
+    from Qub.Tools import QubImageSave
+except ImportError:
+    pass
 from HardwareRepository.BaseHardwareObjects import Equipment
 from HardwareRepository.TaskUtils import *
 import tempfile
@@ -241,6 +244,8 @@ class MiniDiff(Equipment):
             self.connect(self.aperture, 'predefinedPositionChanged', self.apertureChanged)
             self.connect(self.aperture, 'positionReached', self.apertureChanged)
 
+        #Agree on a correct method name, inconsistent arguments for moveToBeam, disabled temporarily
+        #self.move_to_coord = self.moveToBeam()
 
     def save_snapshot(self, filename):
         set_light_in(self.lightWago, self.lightMotor, self.zoomMotor)
@@ -468,6 +473,8 @@ class MiniDiff(Equipment):
   
     def motor_positions_to_screen(self, centred_positions_dict):
         self.pixelsPerMmY, self.pixelsPerMmZ = self.getCalibrationData(self.zoomMotor.getPosition())
+        if None in (self.pixelsPerMmY,self.pixelsPerMmZ):
+            return 0,0
         phi_angle = math.radians(self.centringPhi.direction*self.centringPhi.getPosition()) 
         sampx = self.centringSamplex.direction * (centred_positions_dict["sampx"]-self.centringSamplex.getPosition())
         sampy = self.centringSampley.direction * (centred_positions_dict["sampy"]-self.centringSampley.getPosition())
@@ -512,27 +519,21 @@ class MiniDiff(Equipment):
         self.emitProgressMessage("")
         self.emit("newAutomaticCentringPoint", (-1,-1))
 
-        res = auto_centring_procedure.get()
-        
-        if isinstance(res, gevent.GreenletExit):
-          logging.error("Could not complete automatic centring")
-          self.emitCentringFailed()
-        else: 
-          positions = self.zoomMotor.getPredefinedPositionsList()
-          i = len(positions) / 2
-          #self.zoomMotor.moveToPosition(positions[i-1])
-
-          #be sure zoom stop moving
-          while self.zoomMotor.motorIsMoving():
-              time.sleep(0.1)
-
-          self.pixelsPerMmY, self.pixelsPerMmZ = self.getCalibrationData(self.zoomMotor.getPosition())
-
-          if self.user_confirms_centring:
-            self.emitCentringSuccessful()
-          else:
-            self.emitCentringSuccessful()
-            self.acceptCentring()
+        try:
+            res = auto_centring_procedure.get()
+        except Exception:
+            logging.error("Could not complete automatic centring")
+            self.emitCentringFailed()
+            self.rejectCentring()
+        else:
+            if res is None:    
+                logging.error("Could not complete automatic centring")
+                self.emitCentringFailed()
+                self.rejectCentring()
+            else: 
+                self.emitCentringSuccessful()
+                if not self.user_confirms_centring:
+                    self.acceptCentring()
               
     def startAutoCentring(self, sample_info=None, loop_only=False):
         self.currentCentringProcedure = sample_centring.start_auto(self.camera, 

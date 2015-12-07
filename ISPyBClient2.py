@@ -25,6 +25,7 @@ _WSDL_ROOT = ''
 _WS_BL_SAMPLE_URL = _WSDL_ROOT + 'ToolsForBLSampleWebService?wsdl'
 _WS_SHIPPING_URL = _WSDL_ROOT + 'ToolsForShippingWebService?wsdl'
 _WS_COLLECTION_URL = _WSDL_ROOT + 'ToolsForCollectionWebService?wsdl'
+_WS_AUTOPROC_URL = _WSDL_ROOT + 'ToolsForAutoprocessingWebService?wsdl'
 _WS_USERNAME = 'ispybws1'
 _WS_PASSWORD = '!5pybws1'
 
@@ -109,6 +110,9 @@ class ISPyBClient2(HardwareObject):
         self.__disabled = False
         self.beamline_name = False
         
+        self.ws_user_name = None
+        self.ws_pass = None 
+
         logger = logging.getLogger('ispyb_client')
         
         try:
@@ -119,7 +123,6 @@ class ISPyBClient2(HardwareObject):
             logger.addHandler(hdlr) 
         except:
             pass
-
         logger.setLevel(logging.INFO)
 
       
@@ -127,8 +130,16 @@ class ISPyBClient2(HardwareObject):
         """
         Init method declared by HardwareObject.
         """
-        session_hwobj = self.getObjectByRole('session')
+        self.session_hwobj = self.getObjectByRole('session')
+        self.beamline_name = self.session_hwobj.beamline_name
         
+        self.ws_user_name = self.getProperty("wsUserName")
+        if not self.ws_user_name:
+            self.ws_user_name = _WS_USERNAME
+        self.ws_pass = self.getProperty("wsPass")
+        if not self.ws_pass:
+            self.ws_pass = _WS_PASSWORD
+
         try:
             # ws_root is a property in the configuration xml file
             if self.ws_root:
@@ -137,6 +148,7 @@ class ISPyBClient2(HardwareObject):
                 global _WS_SHIPPING_URL
                 global _WS_COLLECTION_URL
                 global _WS_SCREENING_URL
+                global _WS_AUTOPROC_URL
 
                 _WSDL_ROOT = self.ws_root.strip()
                 _WS_BL_SAMPLE_URL = _WSDL_ROOT + \
@@ -145,15 +157,20 @@ class ISPyBClient2(HardwareObject):
                     'ToolsForShippingWebService?wsdl'
                 _WS_COLLECTION_URL = _WSDL_ROOT + \
                     'ToolsForCollectionWebService?wsdl'
+                _WS_AUTOPROC_URL = _WSDL_ROOT + \
+                    'ToolsForAutoprocessingWebService?wsdl'
 
-                t1 = HttpAuthenticated(username = _WS_USERNAME, 
-                                      password = _WS_PASSWORD)
+                t1 = HttpAuthenticated(username = self.ws_user_name, 
+                                      password = self.ws_pass)
                 
-                t2 = HttpAuthenticated(username = _WS_USERNAME, 
-                                      password = _WS_PASSWORD)
+                t2 = HttpAuthenticated(username = self.ws_user_name, 
+                                      password = self.ws_pass)
                 
-                t3 = HttpAuthenticated(username = _WS_USERNAME, 
-                                      password = _WS_PASSWORD)
+                t3 = HttpAuthenticated(username = self.ws_user_name, 
+                                      password = self.ws_pass)
+
+                t4 = HttpAuthenticated(username = self.ws_user_name,
+                                       password = self.ws_pass)
                 
                 try: 
                     self.__shipping = Client(_WS_SHIPPING_URL, timeout = 3,
@@ -162,7 +179,15 @@ class ISPyBClient2(HardwareObject):
                                                transport = t2, cache = None)
                     self.__tools_ws = Client(_WS_BL_SAMPLE_URL, timeout = 3,
                                              transport = t3, cache = None)
-                    
+                    self.__autoproc_ws = Client(_WS_AUTOPROC_URL, timeout = 3,
+                                             transport = t4, cache = None)
+                
+                    # ensure that suds do not create those files in tmp 
+                    self.__shipping.set_options(cache=None)
+                    self.__collection.set_options(cache=None)
+                    self.__tools_ws.set_options(cache=None)
+                    self.__autoproc_ws.set_options(cache=None)
+    
                 except URLError:
                     logging.getLogger("ispyb_client")\
                         .exception(_CONNECTION_ERROR_MSG)
@@ -174,7 +199,7 @@ class ISPyBClient2(HardwareObject):
         # Add the porposal codes defined in the configuration xml file
         # to a directory. Used by translate()
         try:
-            proposals = session_hwobj['proposals']
+            proposals = self.session_hwobj['proposals']
             
             for proposal in proposals:
                 code = proposal.code
@@ -193,8 +218,6 @@ class ISPyBClient2(HardwareObject):
                     pass
         except IndexError:
             pass
-
-        self.beamline_name = session_hwobj.beamline_name
 
     def translate(self, code, what):  
         """
@@ -371,7 +394,6 @@ class ISPyBClient2(HardwareObject):
           # (not a fatal error), but display exception still
           logging.exception("Could not store data collection")
           return (0,0,0)
-          
 
     def _store_data_collection(self, mx_collection, beamline_setup = None):
         """
@@ -546,7 +568,7 @@ class ISPyBClient2(HardwareObject):
                 exception("Error in update_bl_sample: could not connect to server")
 
 
-    @in_greenlet
+    #@in_greenlet
     def store_image(self, image_dict):
         """
         Stores the image (image parameters) <image_dict>
@@ -558,11 +580,12 @@ class ISPyBClient2(HardwareObject):
         """
         if self.__disabled:
             return
-        
+    
         if self.__collection:
             if 'dataCollectionId' in image_dict:
                 try:
-                    self.__collection.service.storeOrUpdateImage(image_dict)
+                    image_id = self.__collection.service.storeOrUpdateImage(image_dict)
+                    return image_id
                 except WebFault:
                     logging.getLogger("ispyb_client").\
                         exception("ISPyBClient: exception in store_image")
@@ -1171,6 +1194,211 @@ class ISPyBClient2(HardwareObject):
 
         return pos_id
 
+    @trace
+    def get_proposals_by_user(self, user_name):
+        proposal_list = []
+        res_proposal = []
+
+        if self.__disabled:
+            return proposal_list
+
+        if self.__shipping:
+            try:
+               proposals = eval(self.__shipping.service.getProposalsByLoginName(user_name))  
+               if proposal_list is not None:
+                   for proposal in proposals:
+                        if proposal['type'].upper() in ['MX', 'MB']:
+                           proposal_list.append(proposal)
+            except WebFault, e:
+               proposal_list = []
+               logging.getLogger("ispyb_client").exception(e.message)
+
+            res_proposal = []
+            if len(proposal_list) > 0:
+                for proposal in proposal_list:
+
+                    proposal_code = proposal['code']
+                    proposal_number = proposal['number']
+
+                    #person
+                    try:
+                        person = self.__shipping.service.\
+                                      findPersonByProposal(proposal_code,
+                                                           proposal_number)
+                        if not person:
+                            person = {}
+                    except WebFault, e:
+                        logging.getLogger("ispyb_client").exception(e.message)
+                        person = {}
+
+                    #lab
+                    try:
+                        lab = self.__shipping.service.\
+                                   findLaboratoryByProposal(proposal_code,
+                                                            proposal_number)
+                        if not lab:
+                            lab = {}
+                    except WebFault, e:
+                        logging.getLogger("ispyb_client").exception(e.message)
+                        lab = {}
+
+                    #sessions
+                    try:
+                        res_sessions = self.__collection.service.\
+                               findSessionsByProposalAndBeamLine(proposal_code,
+                                                                 proposal_number,
+                                                                 self.beamline_name)
+                        sessions = []
+                        for session in res_sessions:
+                            if session is not None :
+                                try:
+                                    session.startDate = \
+                                        datetime.strftime(session.startDate,
+                                                          "%Y-%m-%d %H:%M:%S")
+                                    session.endDate = \
+                                        datetime.strftime(session.endDate,
+                                                          "%Y-%m-%d %H:%M:%S")
+                                except:
+                                    pass
+                                sessions.append(utf_encode(asdict(session)))
+
+                    except WebFault, e:
+                        logging.getLogger("ispyb_client").exception(e.message)
+                        sessions = []
+
+                    
+                    res_proposal.append({'Proposal': proposal,
+                                         'Person': utf_encode(asdict(person)),
+                                         'Laboratory': utf_encode(asdict(lab)),
+                                         'Sessions' : sessions})
+            else:
+                logging.getLogger("ispyb_client").\
+                   warning("No proposals for user %s found" %user_name)
+        else:
+            logging.getLogger("ispyb_client").\
+                exception("Error in get_proposal: Could not connect to server," + \
+                          " returning empty proposal")
+        return res_proposal 
+
+    def store_autoproc_program(self, autoproc_program_dict):
+        """
+        """
+        autoproc_program_id = None
+        try:
+            autoproc_program_id = self.__autoproc_ws.service.\
+                storeOrUpdateAutoProcProgram(\
+                   processingPrograms = autoproc_program_dict["processing_programs"],
+                   processingStatus = 1, #make correct
+                   processingStartTime = datetime.strptime(autoproc_program_dict\
+                        ["processing_start_time"], "%Y-%m-%d %H:%M:%S"),
+                   processingEndTime = datetime.strptime(autoproc_program_dict\
+                        ["processing_end_time"], "%Y-%m-%d %H:%M:%S"))
+        except ex:
+            msg = 'Could not store autoprocessing program in lims: %s' % ex.message
+            logging.getLogger("ispyb_client").exception(msg)
+        return autoproc_program_id
+
+    @trace
+    def store_workflow(self, *args, **kwargs):
+        try:
+          return self._store_workflow(*args, **kwargs)
+        except gevent.GreenletExit:
+          raise
+        except:
+          logging.exception("Could not store workflow")
+          return 0
+
+    def _store_workflow(self, info_dict):
+        """
+        Stores the data collection mx_collection, and the beamline setup
+        if provided.
+
+        :param mx_collection: The data collection parameters.
+        :type mx_collection: dict
+        
+        :param beamline_setup: The beamline setup.
+        :type beamline_setup: dict
+
+        :returns: None
+        """
+        if self.__disabled:
+            return None, None, None
+
+        workflow_id = None
+        workflow_mesh_id = None
+        grid_info_id = None
+
+        if self.__collection:
+            workflow_vo = ISPyBValueFactory().\
+                workflow_from_workflow_info(info_dict)
+            workflow_id = self.__collection.service.\
+                          storeOrUpdateWorkflow(workflow_vo)
+
+            workflow_mesh_vo = ISPyBValueFactory().\
+                 workflow_mesh_from_workflow_info(info_dict)
+            workflow_mesh_vo.workflowId = workflow_id
+
+            workflow_mesh_id = self.__collection.service.\
+                               storeOrUpdateWorkflowMesh(workflow_mesh_vo)
+
+            grid_info_vo = ISPyBValueFactory().\
+               grid_info_from_workflow_info(info_dict)
+            grid_info_vo.workflowMeshId = workflow_mesh_id
+
+            grid_info_id = self.__collection.service.\
+                           storeOrUpdateGridInfo(grid_info_vo)
+            return workflow_id, workflow_mesh_id, grid_info_id
+
+        else:
+            logging.getLogger("ispyb_client").\
+                exception("Error in store_workflow: could not connect" + \
+                          " to server")
+            return 0, 0, 0
+
+    def store_centred_position(self, cpos, grid_index_y=None, grid_index_z=None):
+        """
+        """
+        pos_id = -1
+        mpos_dict = {'omega' : cpos.phi,
+                     'phi': cpos.kappa_phi,
+                     'kappa': cpos.kappa,
+                     'phiX': cpos.phi,
+                     'phiY': cpos.phiy,
+                     'phiZ': cpos.phiz,
+                     'sampX': cpos.sampx,
+                     'sampY': cpos.sampy}
+        #if grid_index_y and grid_index_z:
+        mpos_dict['gridIndexY'] = grid_index_y
+        mpos_dict['gridIndexZ'] = grid_index_z
+
+        try:
+            pos_id = self.__collection.service.\
+                     storeOrUpdateMotorPosition(mpos_dict)
+        except:
+            msg = 'Could not store centred position in lims'
+            logging.getLogger("ispyb_client").exception(msg)
+
+        return pos_id
+
+    def store_image_quality_indicators(self, image_dict):
+        """
+        """
+        quality_ind_id = -1
+        quality_ind_dict = {"imageId": image_dict["image_id"],
+                            "autoProcProgramId": image_dict["auto_proc_program"],
+                            "dozor_score": image_dict["score"],
+                            "spotTotal" : image_dict["spots_num"],
+                            "goodBraggCandidates": image_dict["spots_num"],
+                            "totalIntegratedSignal": image_dict["spots_int_aver"],
+                            "method1Res": image_dict["spots_resolution"]}
+        try:
+           quality_ind_id = self.__autoproc_ws.service.\
+                storeOrUpdateImageQualityIndicators(quality_ind_dict)
+        except ex:
+            msg = 'Could not store image quality indicators in lims: %s' % ex.message
+            logging.getLogger("ispyb_client").exception(msg)
+        return quality_ind_id
+
     # Bindings to methods called from older bricks.
     getProposal = get_proposal
     getSessionLocalContact = get_session_local_contact
@@ -1335,7 +1563,12 @@ class ISPyBValueFactory():
 
 
             try:
-                group.comments = mx_collect_dict['comment']
+                group.comments = mx_collect_dict['comments']
+            except KeyError,diag:
+                pass
+
+            try:
+                group.workflowId = mx_collect_dict['workflow_id']
             except KeyError,diag:
                 pass
 
@@ -1640,6 +1873,104 @@ class ISPyBValueFactory():
         data_collection.endTime = datetime.now()
 
         return data_collection
+
+    def workflow_from_workflow_info(self, workflow_info_dict):
+        """
+        Ceates workflow3VO from worflow_info_dict.
+        :rtype: workflow3VO
+        """
+        ws_client = None
+        workflow_vo = None
+
+        try:
+            ws_client = Client(_WS_COLLECTION_URL,
+                               cache = None)
+            workflow_vo = \
+                ws_client.factory.create('workflow3VO')
+        except:
+            raise
+
+        try:
+            if workflow_info_dict.get("workflow_id"):
+                workflow_vo.workflowId = workflow_info_dict.get("workflow_id")
+            workflow_vo.workflowType = workflow_info_dict.get("workflow_type", "MeshScan")
+            workflow_vo.comments = workflow_info_dict.get("comments", "")
+            workflow_vo.logFilePath = workflow_info_dict.get("log_file_path", "")
+            workflow_vo.resultFilePath = workflow_info_dict.get("result_file_path", "")
+            workflow_vo.status = workflow_info_dict.get("status", "")
+            workflow_vo.workflowTitle = workflow_info_dict.get("title", "")
+        except KeyError,diag:
+            err_msg = \
+                "ISPyBClient: error storing a workflow (%s)" % str(diag)
+            raise ISPyBArgumentError(err_msg)
+
+        return workflow_vo
+
+    def workflow_mesh_from_workflow_info(self, workflow_info_dict):
+        """
+        Ceates workflowMesh3VO from worflow_info_dict.
+        :rtype: workflowMesh3VO
+        """
+        ws_client = None
+        workflow_mesh_vo = None
+
+        try:
+            ws_client = Client(_WS_COLLECTION_URL,
+                               cache = None)
+            workflow_mesh_vo = \
+                ws_client.factory.create('workflowMeshWS3VO')
+        except:
+            raise
+
+        try:
+            if workflow_info_dict.get("workflow_mesh_id"):
+                workflow_mesh_vo.workflowMeshId = workflow_info_dict.get("workflow_mesh_id")
+            workflow_mesh_vo.cartographyPath = workflow_info_dict.get("cartography_path", "")
+            workflow_mesh_vo.bestImageId = workflow_info_dict.get("best_image_id", "")
+            workflow_mesh_vo.bestPositionId = workflow_info_dict.get("best_position_id")
+            workflow_mesh_vo.value1 = workflow_info_dict.get("value_1")
+            workflow_mesh_vo.value2 = workflow_info_dict.get("value_2")
+            workflow_mesh_vo.value3 = workflow_info_dict.get("value_3")
+            workflow_mesh_vo.value4 = workflow_info_dict.get("value_4")
+        except KeyError,diag:
+            err_msg = \
+                "ISPyBClient: error storing a workflow mesh (%s)" % str(diag)
+            raise ISPyBArgumentError(err_msg)
+
+        return workflow_mesh_vo
+
+    def grid_info_from_workflow_info(self, workflow_info_dict):
+        """
+        Ceates grid3VO from worflow_info_dict.
+        :rtype: grid3VO
+        """
+        ws_client = None
+        grid_info_vo = None
+
+        try:
+            ws_client = Client(_WS_COLLECTION_URL,
+                               cache = None)
+            grid_info_vo = \
+                ws_client.factory.create('gridInfoWS3VO')
+        except:
+            raise
+
+        try:
+            if workflow_info_dict.get("grid_info_id"):
+                grid_info_vo.gridInfoId = workflow_info_dict.get("grid_info_id")
+            grid_info_vo.dx_mm = workflow_info_dict.get("dx_mm")
+            grid_info_vo.dy_mm = workflow_info_dict.get("dy_mm")
+            grid_info_vo.meshAngle = workflow_info_dict.get("mesh_angle")
+            grid_info_vo.steps_x = workflow_info_dict.get("steps_x")
+            grid_info_vo.steps_y = workflow_info_dict.get("steps_y")
+            grid_info_vo.xOffset = workflow_info_dict.get("xOffset")
+            grid_info_vo.yOffset = workflow_info_dict.get("yOffset")
+        except KeyError,diag:
+            err_msg = \
+                "ISPyBClient: error storing a grid info (%s)" % str(diag)
+            raise ISPyBArgumentError(err_msg)
+
+        return grid_info_vo
 
 
 class ISPyBArgumentError(Exception):
