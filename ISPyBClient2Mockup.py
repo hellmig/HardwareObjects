@@ -5,6 +5,7 @@ A client for ISPyB Webservices.
 import logging
 import os
 import datetime
+import time
 
 from HardwareRepository import HardwareRepository
 from HardwareRepository.BaseHardwareObjects import HardwareObject
@@ -125,7 +126,10 @@ class ISPyBClient2Mockup(HardwareObject):
         :returns: None
 
         """
-        return None, None
+        dc_id = int(time.mktime(time.localtime()))
+        det_id = 0
+
+        return dc_id, det_id
 
 
     def store_beamline_setup(self, session_id, beamline_setup):
