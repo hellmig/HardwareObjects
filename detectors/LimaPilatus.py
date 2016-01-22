@@ -1,3 +1,4 @@
+import logging
 import gevent
 import time
 import subprocess
@@ -49,6 +50,20 @@ class Pilatus:
       self.addCommand({ "type": "tango",
                         "name": "set_image_header",
                         "tangoname": lima_device }, "SetImageHeader")
+
+      prop_create_path_ssh = self.getProperty("create_remote_path_ssh")
+      if prop_create_path_ssh is not None:
+          # Property defined in the xml file
+          try:
+              prop_create_path_ssh = bool(prop_create_path_ssh)
+          except TypeError as error:
+              prop_create_path_ssh = True
+              logging.getLogger("user_level_log").warning("Pilatus HwObj: error converting property >create_remote_path_ssh<.")
+              logging.getLogger("user_level_log").warning("               check xml configuration!")
+      else:
+          # if property is not specified: use the old def. behaviour to copy remotely
+          logging.getLogger("user_level_log").warning("Pilatus HwObj: property >create_remote_path_ssh< not defined, using default.")
+          prop_create_path_ssh = True
 
   def wait_ready(self):
       acq_status_chan = self.getChannelObject("acq_status")
@@ -144,12 +159,15 @@ class Pilatus:
         dirname = dirname[len(os.path.sep):]
       
       saving_directory = os.path.join(self.config.getProperty("buffer"), dirname)
-      subprocess.Popen("ssh %s@%s mkdir --parents %s" % (os.environ["USER"],
-                                                         self.config.getProperty("control"),
-                                                         saving_directory),
-                                                         shell=True, stdin=None, 
-                                                         stdout=None, stderr=None, 
-                                                         close_fds=True).wait()
+
+      # only create remote path via ssh if property is set
+      if prop_create_path_ssh:
+          subprocess.Popen("ssh %s@%s mkdir --parents %s" % (os.environ["USER"],
+                                                             self.config.getProperty("control"),
+                                                             saving_directory),
+                                                             shell=True, stdin=None, 
+                                                             stdout=None, stderr=None, 
+                                                             close_fds=True).wait()
       
       self.wait_ready()  
    
