@@ -1,4 +1,4 @@
-from Qub.Tools import QubImageSave
+# from Qub.Tools import QubImageSave
 from HardwareRepository.BaseHardwareObjects import Equipment
 import tempfile
 import logging
@@ -16,6 +16,7 @@ from BlissFramework.Utils import terminal_server
 import PyTango
 
 class MD2v4(MiniDiff.MiniDiff):
+
     def init(self):
         self.phiMotor = self.getDeviceByRole('phi')
         self.x_calib = self.getChannelObject("x_calib_attr")
@@ -35,6 +36,33 @@ class MD2v4(MiniDiff.MiniDiff):
 
         MiniDiff.MiniDiff.init(self)
         self.centringPhiy.direction = -1
+
+        try:
+            self.grid_direction = eval(self.getProperty("gridDirection"))
+        except:
+            self.grid_direction = {"fast": (0, 1), "slow": (1, 0)}
+            logging.getLogger("HWR").warning('MD2v4: Grid direction is not defined. Using default.')
+        try:
+            self.phase_list = eval(self.getProperty("phaseList"))
+        except:
+            self.phase_list = []  
+        self.centring_hwobj = self.getObjectByRole('centring')
+        if self.centring_hwobj is None:
+            logging.getLogger("HWR").debug('EMBLMinidiff: Centring math is not defined')
+
+        # make the diffractometer object compatible with the new graphics manager
+        # in Qt4 implementation
+        # ---------------------
+        self.start_centring_method = self.startCentringMethod
+        self.cancel_centring_method = self.cancelCentringMethod 
+        self.image_clicked = self.imageClicked 
+        self.accept_centring = self.acceptCentring 
+        self.reject_centring = self.rejectCentring 
+        self.get_centring_status = self.getCentringStatus 
+        self.take_snapshots = self.takeSnapshots 
+        self.move_motors = self.moveMotors 
+        # ---------------------
+
         #terminal_server.export("udiff", self)
 
     #def beamPositionChanged(self, value):
@@ -80,4 +108,34 @@ class MD2v4(MiniDiff.MiniDiff):
         # do the general centring stuff
         MiniDiff.MiniDiff.startCentringMethod(self, method, sample_info)
 
+    def update_values(self):
+        self.emit('zoomMotorPredefinedPositionChanged', None, None)
+        omega_ref = [0, 288]
+        self.emit('omegaReferenceChanged', omega_ref)
+
+    def get_phase_list(self):
+        return self.phase_list
+
+    def get_grid_direction(self):
+        """
+        Descript. :
+        """
+        return self.grid_direction
+
+    def in_plate_mode(self):
+	return False
+
+    def take_snapshots(self, image_count, wait = False):
+        """
+        Descript. :
+        """
+
+        return
+
+    def takeSnapshots(self, image_count, wait = False):
+        """
+        Descript. :
+        """
+
+        return
 

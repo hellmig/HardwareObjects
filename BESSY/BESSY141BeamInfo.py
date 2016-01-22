@@ -53,10 +53,12 @@ class BESSY141BeamInfo(BeamInfo):
         self.horizpos = self.horizpos_channel.getValue()
         if self.vertpos is not None:
             self.emit("beamPosChanged", ([self.horizpos, self.vertpos]))
+            self.emit("beamPositionChanged", ([self.horizpos, self.vertpos]))
 
     def verticalPositionChanged(self,value):
         logging.getLogger().info("Vertical beam position changed. It is %s" % str(value))
         self.vertpos = self.vertpos_channel.getValue()
         if self.horizpos is not None:
             self.emit("beamPosChanged", ([self.horizpos, self.vertpos]))
+            self.emit("beamPositionChanged", ([self.horizpos, self.vertpos]))
 

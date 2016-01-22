@@ -187,3 +187,7 @@ class EscFilters(Equipment):
         curr_bits = self.getAttState()
         val = self.bits[attenuator_index]
         return bool(val & curr_bits)
+
+
+    def update_values(self):
+        self.emit('valueChanged', (self.attFactor, )) 

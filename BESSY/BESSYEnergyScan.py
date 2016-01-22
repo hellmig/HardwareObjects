@@ -32,6 +32,7 @@ class TunableEnergy:
     
 class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
     def __init__(self, name, tunable_bl):
+        print "BESSYEnergyScan.__init__"
         AbstractEnergyScan.__init__(self)
         HardwareObject.__init__(self, name)
         self._tunable_bl = tunable_bl
@@ -311,3 +312,38 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         self.emit('chooch_finished', (pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, rm, chooch_graph_x, chooch_graph_y1, chooch_graph_y2, title))
         return pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, rm, chooch_graph_x, chooch_graph_y1, chooch_graph_y2, title
 
+    def startEnergyScan(self,element,edge,directory,prefix,session_id=None,blsample_id=None):
+
+        self.emit('energyScanStarted', ())
+        STATICPARS_DICT = {}
+        #Set the energy from the element and edge parameters
+        STATICPARS_DICT = self.get_static_parameters(element,edge)
+        
+        self.energy_scan_parameters = STATICPARS_DICT
+        self.energy_scan_parameters["element"] = element
+        self.energy_scan_parameters["edge"] = edge
+        self.energy_scan_parameters["directory"] = directory
+        #create the directory if needed
+        if not os.path.exists(directory):
+             os.makedirs(directory)
+        self.energy_scan_parameters["prefix"]=prefix
+        if session_id is not None:
+            self.energy_scan_parameters["sessionId"] = session_id
+            self.energy_scan_parameters["blSampleId"] = blsample_id
+            self.energy_scan_parameters['startTime']=time.strftime("%Y-%m-%d %H:%M:%S")
+
+        with error_cleanup(self.escan_cleanup):
+            self.escan_prepare()
+            self.energy_scan_hook(self.energy_scan_parameters)
+            self.open_safety_shutter(timeout=10)
+            self.choose_attenuation()
+            self.close_fast_shutter()
+            logging.getLogger("HWR").debug("Doing the scan, please wait...")
+            self.execute_energy_scan(self.energy_scan_parameters)
+            self.escan_postscan()
+            
+        self.close_fast_shutter()
+        self.close_safety_shutter(timeout=10)
+        #send finish sucessfully signal to the brick
+        self.emit('energyScanFinished', (self.energy_scan_parameters,))
+        self.ready_event.set()

@@ -3,6 +3,7 @@ import logging
 
 class BESSY141EnergyScan(BESSYEnergyScan):
     def __init__(self, name):
+        print "BESSY141EnergyScan.__init__"
         BESSYEnergyScan.__init__(self, name, TunableEnergy())
 
     @task

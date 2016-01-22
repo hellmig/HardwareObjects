@@ -67,3 +67,6 @@ class MachCurrentEpics(BaseHardwareObjects.Device):
     def getFillMode(self):
         #return self.getChannelObject('fill_mode').getValue()
         return self.fillModeStr
+
+    def has_cryo(self):
+	return False
