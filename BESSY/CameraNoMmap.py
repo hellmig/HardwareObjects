@@ -1,7 +1,7 @@
 """Class for cameras connected to framegrabbers run by Taco Device Servers
 
 template:
-  <device class = "Camera">
+  <device class = "CameraNoMmap">
     <username>user label</username>
     <!-- <taconame>device server name (//host/.../.../...)</taconame> -->
     <interval>polling interval (in ms.)</interval>
@@ -15,20 +15,20 @@ template:
     </calibration> -->
   </device>
 """
-from HardwareRepository import HardwareRepository
 from HardwareRepository import BaseHardwareObjects
 from HardwareRepository import CommandContainer
+from HardwareRepository import HardwareRepository
 import gevent
 import logging
 import os
 import time
 import sys
 
-try:
-    from Qub.CTools.qttools import BgrImageMmap
-except ImportError:
-    logging.getLogger("HWR").warning("Qub memory map not available: cannot use mmap image type")
-    BgrImageMmap = None
+from PyQt4 import QtGui
+
+
+logging.getLogger("HWR").warning("Qub memory map module not loaded: cannot use mmap image type")
+BgrImageMmap = None
 
 try:
   import Image
@@ -72,7 +72,7 @@ class RGBType(ImageType):
 
 
 
-class Camera(BaseHardwareObjects.Device):
+class CameraNoMmap(BaseHardwareObjects.Device):
     def _init(self):
        if self.getProperty("tangoname"):
             # Tango device
@@ -183,7 +183,13 @@ class Camera(BaseHardwareObjects.Device):
 
                 def newImage(self, img_cnt):
                     streamChan = self.getChannelObject("stream")
-                    self.emit("imageReceived", streamChan.getValue(), self.getWidth(), self.getHeight(), self.forceUpdate)
+                    raw_buffer = streamChan.getValue()
+                    #self.emit("imageReceived", streamChan.getValue(), self.getWidth(), self.getHeight(), self.forceUpdate)
+		    qimage = QtGui.QImage.fromData(raw_buffer)
+		    #if self.cam_mirror is not None:
+		    #	qimage = qimage.mirrored(self.cam_mirror[0], self.cam_mirror[1])     
+                    pixmap = QtGui.QPixmap.fromImage(qimage)
+		    self.emit("imageReceived", pixmap)
 
                 def __checkImageCounter(self,lastImageNumber = [0]) :
                     lastNumber = lastImageNumber[0]
@@ -211,15 +217,11 @@ class Camera(BaseHardwareObjects.Device):
                       if remote_client and self.getProperty("remote_imagetype"):
                          self.setImageTypeFromXml("remote_imagetype")
 
-                      if isinstance(self.imgtype, MmapType):
-                          self.__mmapBgr = BgrImageMmap(self.imgtype.mmapFile)
-                          self.__mmapBrgPolling = gevent.spawn(self._do_mmapBrgPolling, self.getProperty("interval")/1000.0) 
-                      else:
-                        try:
-                          imgCnt = self.addChannel({ 'type': 'tango', 'name':'img_cnt', 'polling': self.getProperty("interval") }, "ImageCounter")
-                          imgCnt.connectSignal("update", self.newImage)
-                        except:
-                          pass
+                      try:
+                        imgCnt = self.addChannel({ 'type': 'tango', 'name':'img_cnt', 'polling': self.getProperty("interval") }, "ImageCounter")
+                        imgCnt.connectSignal("update", self.newImage)
+                      except:
+                        pass
 
 
                 #############   CONTRAST   #################
@@ -351,6 +353,10 @@ class Camera(BaseHardwareObjects.Device):
                 def getGammaMinMax(self):
                     _config = self.device.get_attribute_config('gamma')
                     return ( _config.min_value, _config.max_value)
+
+         
+                def get_image_dimensions(self):
+                    return list((659, 493))
 
 
                 #############   WIDTH   #################
@@ -549,6 +555,11 @@ class Camera(BaseHardwareObjects.Device):
                     self.res["bpmon"]     = bpm
 
                     return self.res
+
+
+                def start_camera(self):
+                    return 
+
 
                 def setLive(self, mode):
                     """tango"""
