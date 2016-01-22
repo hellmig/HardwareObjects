@@ -37,7 +37,7 @@ class Basket(Container):
     NO_OF_SAMPLES_PER_PUCK = 10
 
     def __init__(self,container,number):
-        super(Basket, self).__init__(self.__TYPE__,container,Basket.getBasketAddress(number),True)
+        super(Basket, self).__init__(self.__TYPE__,container,Basket.getBasketAddress(number),False)
         for i in range(Basket.NO_OF_SAMPLES_PER_PUCK):
             slot = Pin(self,number,i+1)
             self._addComponent(slot)
