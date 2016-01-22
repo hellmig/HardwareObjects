@@ -107,6 +107,10 @@ class Resolution(BaseHardwareObjects.HardwareObject):
         self.emit("positionChanged", (res, ))
         self.emit('valueChanged', (res, ))
          
+    def update_values(self):
+        self.emit("positionChanged", (self.currentResolution, ))
+        self.emit('valueChanged', (self.currentResolution, ))
+         
     def getState(self):
         return self.dtox.getState()
 
