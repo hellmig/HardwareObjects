@@ -51,7 +51,7 @@ class Pilatus:
                         "name": "set_image_header",
                         "tangoname": lima_device }, "SetImageHeader")
 
-      prop_create_path_ssh = self.getProperty("create_remote_path_ssh")
+      prop_create_path_ssh = self.config.getProperty("create_remote_path_ssh")
       if prop_create_path_ssh is not None:
           # Property defined in the xml file
           try:
@@ -64,6 +64,7 @@ class Pilatus:
           # if property is not specified: use the old def. behaviour to copy remotely
           logging.getLogger("user_level_log").warning("Pilatus HwObj: property >create_remote_path_ssh< not defined, using default.")
           prop_create_path_ssh = True
+      self.prop_create_path_ssh = prop_create_path_ssh
 
   def wait_ready(self):
       acq_status_chan = self.getChannelObject("acq_status")
@@ -161,7 +162,7 @@ class Pilatus:
       saving_directory = os.path.join(self.config.getProperty("buffer"), dirname)
 
       # only create remote path via ssh if property is set
-      if prop_create_path_ssh:
+      if self.prop_create_path_ssh:
           subprocess.Popen("ssh %s@%s mkdir --parents %s" % (os.environ["USER"],
                                                              self.config.getProperty("control"),
                                                              saving_directory),
