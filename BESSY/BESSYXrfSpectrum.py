@@ -1,4 +1,3 @@
-from qt import *
 from HardwareRepository.BaseHardwareObjects import Equipment
 import logging
 import os
@@ -6,9 +5,9 @@ import time
 import types
 import gevent
 
-class XfeSpectrum(Equipment):
+class BESSYXrfSpectrum(Equipment):
     def init(self):
-        print "************************************* XfeSpectrum HO (BESSY version) ********************************"
+        print "************************************* BESSYXrfSpectrum HO ********************************"
         self.scanning = None
         self.moving = None
 
@@ -73,7 +72,7 @@ class XfeSpectrum(Equipment):
             return False
         return self.doSpectrum is not None
 
-    def startXfeSpectrum(self,ct,directory,prefix,session_id=None,blsample_id=None):
+    def startXrfSpectrum(self,ct,directory,prefix,session_id=None,blsample_id=None):
         self.spectrumInfo = {"sessionId": session_id}
         self.spectrumInfo["blSampleId"] = blsample_id
         if not os.path.isdir(directory):
@@ -156,7 +155,7 @@ class XfeSpectrum(Equipment):
         else:
             self.spectrumCommandFinished(res)
 
-    def cancelXfeSpectrum(self, *args):
+    def cancelXrfSpectrum(self, *args):
         if self.scanning:
             self.doSpectrum.abort()
 
