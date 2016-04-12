@@ -53,8 +53,8 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         if self.dbConnection is None:
             logging.getLogger("HWR").warning('EnergyScan: you should specify the database hardware object')
         self.scanInfo=None
+        self.scanData = None
         self._tunable_bl.energy_obj = self.energy_obj
-
 
         self._xf_elem = self.getChannelObject("xf_elem_table")
         self._am_elem = self.getChannelObject("am_elem_table")
@@ -151,6 +151,13 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
 
         return elements
 
+    def get_scan_data(self):
+        """
+        Descript. : returns energy scan data.
+                    List contains tuples of (energy, counts)
+        """
+        return self.scanData 
+
     def storeEnergyScan(self):
         pass
 
@@ -218,40 +225,34 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
             logging.getLogger("HWR").exception("could not print figure")
         return
 
-    def doChooch(self, elt, edge, scanArchiveFilePrefix, scanFilePrefix):
+    def doChooch(self, elt, edge, scan_directory, archive_directory, prefix):
         symbol = "-".join((elt, edge))
         dateTime = time.strftime("%Y%m%d-%H%M%S")
 
         # build a detailed filename in the form prefix_1_Se-K_20141021-102440
-        scanFilePrefix = "_".join((scanFilePrefix, symbol, dateTime))
-        
-        rawScanFile=os.path.extsep.join((scanFilePrefix, "raw"))
-        scanFile=os.path.extsep.join((scanFilePrefix, "efs"))
-        escan_png = os.path.extsep.join((scanFilePrefix, "png"))
+        prefix = "_".join((prefix, symbol, dateTime))
 
-        if not scanArchiveFilePrefix in (None, ""):
-            scanArchiveFilePrefix = "_".join((scanArchiveFilePrefix, symbol))
-            archiveRawScanFile=os.path.extsep.join((scanArchiveFilePrefix, "raw"))
-            if not os.path.exists(os.path.dirname(scanArchiveFilePrefix)):
-                os.makedirs(os.path.dirname(scanArchiveFilePrefix))
+        scan_file_prefix = os.path.join(scan_directory, prefix) 
+        # don't include support for archive directory in our implementation
+        archive_scan_file_prefix = None
+
+        scan_file_raw_filename = os.path.extsep.join((scan_file_prefix, "raw"))
+        scan_file_efs_filename = os.path.extsep.join((scan_file_prefix, "efs"))
+        scan_file_png_filename = os.path.extsep.join((scan_file_prefix, "png"))
 
         raw_data_file = '/141dat/pxrdat/scans/today/d_scan_000.raw'
         try:
-             scanData = self._readScanData(raw_data_file)
+             self.scanData = self._readScanData(raw_data_file)
         except:
             self.storeEnergyScan()
             self.emit("energyScanFailed", ())
             return
 
-        self._writeRawDataToDisk(rawScanFile, scanData)
-        if not scanArchiveFilePrefix in (None, ""):
-            shutil.copy(rawScanFile, archiveRawScanFile)
-            self.energy_scan_parameters["scanFileFullPath"]=str(archiveRawScanFile)
-        else:
-            self.energy_scan_parameters["scanFileFullPath"]=str(rawScanFile)
+        self._writeRawDataToDisk(scan_file_raw_filename, self.scanData)
+        self.energy_scan_parameters["scanFileFullPath"]=str(scan_file_raw_filename)
 
-        pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, chooch_graph_data = PyChooch.calc(scanData, elt, edge, scanFile)
-        
+        pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, chooch_graph_data = PyChooch.calc(self.scanData, elt, edge, scan_file_efs_filename)
+
         rm=(pk+30)/1000.0
         pk=pk/1000.0
         savpk = pk
@@ -266,8 +267,23 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         self.energy_scan_parameters["inflectionFDoublePrime"]=fppInfl
         self.energy_scan_parameters["comments"] = comm
 
-        chooch_graph_x, chooch_graph_y1, chooch_graph_y2 = zip(*chooch_graph_data)
+        # 2016-04-11-bessy-mh - begin
+        # the unzipping of the result list >chooch_graph_data< produces a RuntimeError exception while executing the list operation
+        # for unknown reason on our exp141b Debian Wheezy installation
+        # The issue seems to be independent of the energy-scan input data and can also be seen with the PyChooch example scan but the 
+        # reason is not understood yet
+        # As a workaround the lists are processed individually with added exception checking which "solves" the problem
+        # chooch_graph_x, chooch_graph_y1, chooch_graph_y2 = zip(*chooch_graph_data)
+        try:
+          chooch_graph_x  = (x  for x, y1, y2 in chooch_graph_data)
+          chooch_graph_y1 = (y1 for x, y1, y2 in chooch_graph_data)
+          chooch_graph_y2 = (y2 for x, y1, y2 in chooch_graph_data)
+        except RuntimeError:
+	  pass
+        # 2016-04-11-bessy-mh - end
         chooch_graph_x = list(chooch_graph_x)
+        chooch_graph_y1 = list(chooch_graph_y1)
+        chooch_graph_y2 = list(chooch_graph_y2)
         for i in range(len(chooch_graph_x)):
           chooch_graph_x[i]=chooch_graph_x[i]/1000.0
 
@@ -284,26 +300,13 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
    
             logging.getLogger("HWR").warning('EnergyScan: calculated peak (%f) is more that 20eV %s the theoretical value (%f). Please check your scan and choose the energies manually' % (savpk, (self.thEdge - ip) > 0.02 and "below" or "above", self.thEdge))
 
-        if not scanArchiveFilePrefix in (None, ""):
-            archiveEfsFile=os.path.extsep.join((scanArchiveFilePrefix, "efs"))
-            try:
-                shutil.copy(scanFile, archiveEfsFile)
-            except:
-                self.storeEnergyScan()
-
         logging.getLogger("HWR").info("<chooch> Saving png" )
         # prepare to save png files
         title = "%10s  %6s  %6s\n%10s  %6.2f  %6.2f\n%10s  %6.2f  %6.2f" % ("energy", "f'", "f''", pk, fpPeak, fppPeak, ip, fpInfl, fppInfl) 
-        x_axis_title = ("%s\n%s" % (scanFile, title))
-        self._writePngResultFile(escan_png, scanData, chooch_graph_data, x_axis_title) 
+        x_axis_title = ("%s\n%s" % (scan_file_raw_filename, title))
+        self._writePngResultFile(scan_file_png_filename, self.scanData, chooch_graph_data, x_axis_title) 
 
-        if not scanArchiveFilePrefix in (None, ""):
-            escan_archivepng = os.path.extsep.join((scanArchiveFilePrefix, "png")) 
-            self.energy_scan_parameters["jpegChoochFileFullPath"]=str(escan_archivepng)
-            logging.getLogger("HWR").info("Saving energy scan to archive directory for ISPyB : %s", escan_archivepng)
-            shutil.copy(escan_png, escan_archivepng)
-        else:
-            self.energy_scan_parameters["jpegChoochFileFullPath"]=str(escan_png)
+        self.energy_scan_parameters["jpegChoochFileFullPath"]=str(scan_file_png_filename)
 
         self.energy_scan_parameters['endTime']=time.strftime("%Y-%m-%d %H:%M:%S")
         self.storeEnergyScan()
