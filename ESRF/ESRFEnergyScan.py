@@ -30,14 +30,15 @@ class TunableEnergy:
 
     
 class GetStaticParameters:
-    def __init__(self, element, edge):
+    def __init__(self, config_file, element, edge):
         self.element = element
         self.edge = edge
-        config_file = "/users/blissadm/local/spec/userconf/EdgeScan.dat"
         self.STATICPARS_DICT = {}
         self.STATICPARS_DICT = self._readParamsFromFile(config_file)
 
     def _readParamsFromFile(self, config_file):
+        static_pars = {}
+
         try:
             f = open(config_file)
             array = []
@@ -47,13 +48,14 @@ class GetStaticParameters:
                 else:
                     pass
         except:
-            return []
+            return {}
         else:
             larr = []
             for k in range(len(array)):
                 if self.element == array[k][1] and self.edge[0] == array[k][2]:
                     larr = map(float,array[k][3:13])
                     larr.append(float(array[k][17]))
+                    static_pars["atomic_nb"] = int(array[k][0])
             if self.edge == "K":
                 to_delete = [1,2,3,4,5,6,7]
             else:
@@ -69,7 +71,6 @@ class GetStaticParameters:
             for ii in sorted(to_delete, reverse=True):
                 del larr[ii]
 
-            static_pars = {}
             larr[0] /= 1000
             static_pars["edgeEnergy"] = larr[0]
             static_pars["startEnergy"] = larr[0] - 0.05
@@ -111,10 +112,8 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
     def isConnected(self):
         return True
 
-    @task
-    def get_static_parameters(self, element, edge):
-
-        pars = GetStaticParameters(element, edge).STATICPARS_DICT
+    def get_static_parameters(self, config_file, element, edge):
+        pars = GetStaticParameters(config_file, element, edge).STATICPARS_DICT
         
         offset_keV = self.getProperty("offset_keV")
         pars["startEnergy"] += offset_keV
@@ -122,27 +121,29 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
         pars["element"] = element
 
         #next to tell spec which energy
-        self.getChannelObject("ae_rcm").setValue(pars)
-        self.execute_command("setRcmValues")
+        try:
+            self.getChannelObject("ae_rcm").setValue(pars)
+            self.execute_command("setRcmValues")
+        except Exception:
+            pass
         
         return pars
 
-    @task
     def open_safety_shutter(self):
         self.safety_shutter.openShutter()
         while self.safety_shutter.getShutterState() == 'closed':
             time.sleep(0.1)
 
-
-    @task
     def close_safety_shutter(self):
         self.safety_shutter.closeShutter()
         while self.safety_shutter.getShutterState() == 'opened':
             time.sleep(0.1)
 
-    @task
     def escan_prepare(self):
-        self.execute_command("presetScan")
+        try:
+            self.execute_command("presetScan")
+        except Exception:
+            pass
         if self.beamsize:
             bsX = self.beamsize.getCurrentPositionName()
             bsY = bsX
@@ -152,27 +153,26 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
         self.energy_scan_parameters["beamSizeHorizontal"] = bsX
         self.energy_scan_parameters["beamSizeVertical"] = bsY
 
-    @task
     def escan_postscan(self):
         self.execute_command("cleanScan")
         
-    @task
     def escan_cleanup(self):
         self.close_fast_shutter()
         self.close_safety_shutter()
-        self.execute_command("cleanScan")
+        try:
+            self.execute_command("cleanScan")
+        except Exception:
+            pass
         self.emit("energyScanFailed", ())
         self.ready_event.set()
 
-    @task
     def close_fast_shutter(self):
         self.execute_command("close_fast_shutter")
 
-    @task
+
     def open_fast_shutter(self):
         self.execute_command("open_fast_shutter")
 
-    @task
     def move_energy(self, energy):
         try:
             self._tunable_bl.energy_obj.move_energy(energy)
@@ -196,7 +196,7 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
             return
         try:
             session_id=int(self.energy_scan_parameters['sessionId'])
-        except:
+        except Exception:
             return
 
         #remove unnecessary for ISPyB fields:
@@ -206,10 +206,13 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
         self.energy_scan_parameters.pop('findattEnergy')
         self.energy_scan_parameters.pop('edge')
         self.energy_scan_parameters.pop('directory')
+        self.energy_scan_parameters.pop('atomic_nb')
 
         gevent.spawn(StoreEnergyScanThread, self.dbConnection,self.energy_scan_parameters)
 
     def doChooch(self, elt, edge, scanArchiveFilePrefix, scanFilePrefix):
+        self.energy_scan_parameters['endTime']=time.strftime("%Y-%m-%d %H:%M:%S")
+
         symbol = "_".join((elt, edge))
         scanArchiveFilePrefix = "_".join((scanArchiveFilePrefix, symbol))
 
@@ -237,15 +240,18 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
             scanData = []
             
             raw_data_file = os.path.join(os.path.dirname(scanFilePrefix), 'data.raw')
+
             try:
                 raw_file = open(raw_data_file, 'r')
             except:
                 self.storeEnergyScan()
                 self.emit("energyScanFailed", ())
                 return
-
             for line in raw_file.readlines()[2:]:
-                (x, y) = line.split('\t')
+                try:
+                    (x, y) = line.split('\t')
+                except:
+                    (x, y) = line.split()
                 x = float(x.strip())
                 y = float(y.strip())
                 #x = x < 1000 and x*1000.0 or x
@@ -257,7 +263,6 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
             f.close()
             pyarch_f.close()
             self.energy_scan_parameters["scanFileFullPath"]=str(archiveRawScanFile)
-
         pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, chooch_graph_data = PyChooch.calc(scanData, elt, edge, scanFile)
         rm=(pk+30)/1000.0
         pk=pk/1000.0
@@ -275,7 +280,7 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
           rm = self.thEdge + 0.03
           comm = 'Calculated peak (%f) is more that 10eV away from the theoretical value (%f). Please check your scan' % (savpk, self.thEdge)
    
-          logging.getLogger("HWR").warning('EnergyScan: calculated peak (%f) is more that 20eV %s the theoretical value (%f). Please check your scan and choose the energies manually' % (savpk, (self.thEdge - ip) > 0.02 and "below" or "above", self.thEdge))
+          logging.getLogger("user_level_log").warning('EnergyScan: calculated peak (%f) is more that 20eV %s the theoretical value (%f). Please check your scan and choose the energies manually' % (savpk, (self.thEdge - ip) > 0.02 and "below" or "above", self.thEdge))
 
         archiveEfsFile=os.path.extsep.join((scanArchiveFilePrefix, "efs"))
         try:
@@ -337,7 +342,6 @@ class ESRFEnergyScan(AbstractEnergyScan, HardwareObject):
         except:
           logging.getLogger("HWR").exception("could not save figure")
 
-        self.energy_scan_parameters['endTime']=time.strftime("%Y-%m-%d %H:%M:%S")
         self.storeEnergyScan()
 
         logging.getLogger("HWR").info("<chooch> returning" )

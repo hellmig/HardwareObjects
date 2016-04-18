@@ -301,7 +301,7 @@ class ShapeHistory(HardwareObject):
         return shape in self.selected_shapes
 
     def get_selected_shapes(self):
-        return self.selected_shapes.values()
+        return list(self.selected_shapes.itervalues())
 
 
 class DrawingEvent(QubDrawingEvent):
@@ -319,7 +319,6 @@ class DrawingEvent(QubDrawingEvent):
         self.selection_cb = None
         self.deletion_cb = None
         self.move_to_centred_position_cb = None
-        self.move_to_screen_position_cb = None
 
     def rawKeyPressed(self, keyevent):
         """
@@ -355,14 +354,6 @@ class DrawingEvent(QubDrawingEvent):
                 self.move_to_centred_position_cb(clicked_shape.\
                                          get_centred_positions()[0])
                 break
-
-        if (clicked_shape is not None and
-            not isinstance(clicked_shape, CanvasGrid)):
-
-            self.move_to_centred_position_cb(clicked_shape.\
-                                             get_centred_positions()[0])
-        else:
-            self.move_to_screen_position_cb(x, y)
 
     def mousePressed(self, x, y):
         """

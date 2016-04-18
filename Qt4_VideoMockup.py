@@ -18,9 +18,8 @@
 #  along with MXCuBE.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import time
 import gevent
-from datetime import datetime
+import numpy as np
 
 from PyQt4 import QtGui
 from PyQt4 import QtCore
@@ -52,7 +51,6 @@ class Qt4_VideoMockup(Device):
         current_path = os.path.join(*current_path[1:-1])
         image_path = os.path.join("/", current_path, "ExampleFiles/fakeimg.jpg")
         self.image = QtGui.QPixmap(image_path)
-        self.painter = QtGui.QPainter(self.image)
         self.image_dimensions = (self.image.width(), self.image.height())
         self.setIsReady(True)
         self.sleep_time = self.getProperty("interval")
@@ -69,102 +67,6 @@ class Qt4_VideoMockup(Device):
         Descript. :
         """
         return
-
-    def contrastExists(self):
-        """
-        Descript. :
-        """
-        return
-
-    def setContrast(self, contrast):
-        """
-        Descript. :
-        """
-        return
-
-    def getContrast(self):
-        """
-        Descript. :
-        """
-        return 
-
-    def getContrastMinMax(self):
-        """
-        Descript. :
-        """
-        return 
-
-    def brightnessExists(self):
-        """
-        Descript. :
-        """
-        return
-
-    def setBrightness(self, brightness):
-        """
-        Descript. :
-        """
-        return
-
-    def getBrightness(self):
-        """
-        Descript. :
-        """ 
-        return 
-
-    def getBrightnessMinMax(self):
-        """
-        Descript. :
-        """
-        return 
-
-    def gainExists(self):
-        """
-        Descript. :
-        """
-        return
-
-    def setGain(self, gain):
-        """
-        Descript. :
-        """
-        return
-
-    def getGain(self):
-        """
-        Descript. :
-        """
-        return
-
-    def getGainMinMax(self):
-        """
-        Descript. :
-        """
-        return 
-
-    def gammaExists(self):
-        """
-        Descript. :
-        """
-        return
-
-    def setGamma(self, gamma):
-        """
-        Descript. :
-        """
-        return
-
-    def getGamma(self):
-        """
-        Descript. :
-        """
-        return 
-
-    def getGammaMinMax(self):
-        """
-        Descript. :
-        """ 
-        return (0, 1)
 
     def setLive(self, mode):
         """
@@ -189,8 +91,57 @@ class Qt4_VideoMockup(Device):
         Descript. :
         """ 
         while True:
-            #datestr = datetime.now().strftime('%Y-%m-%d %H:%M:%S:%f')
-            #self.painter.fillRect(40, 30, 200, 30, QtCore.Qt.white)  
-            #self.painter.drawText(50, 50, datestr)
             self.emit("imageReceived", self.image)
             gevent.sleep(sleep_time)
+
+    def save_snapshot(self, filename, image_type='PNG'):
+        qimage = QtGui.QImage(self.image)
+        qimage.save(filename, image_type)
+
+    def get_snapshot(self, bw=None, return_as_array=None):
+        qimage = QtGui.QImage(self.image)
+        if return_as_array:
+            qimage = qimage.convertToFormat(4)
+            ptr = qimage.bits()
+            ptr.setsize(qimage.byteCount())
+
+            image_array = np.array(ptr).reshape(qimage.height(), qimage.width(), 4)
+            if bw:
+                return np.dot(image_array[...,:3], [0.299, 0.587, 0.144])
+            else:
+                return image_array
+        else:
+            if bw:
+                return qimage.convertToFormat(QtGui.QImage.Format_Mono)
+            else:
+                return qimage
+
+    def get_contrast(self):
+        return 34
+
+    def set_contrast(self, contrast_value):
+        return
+
+    def get_brightness(self):
+        return 54
+
+    def set_brightness(self, brightness_value):
+        return
+  
+    def get_gain(self):
+        return 32
+  
+    def set_gain(self, gain_value):
+        return
+
+    def get_gamma(self):
+        return 22
+
+    def set_gamma(self, gamma_value):
+        return
+
+    def get_exposure_time(self):
+        return 0.23
+
+    def set_exposure_time(self, exposure_time_value):
+        return

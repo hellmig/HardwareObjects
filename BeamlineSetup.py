@@ -15,23 +15,14 @@ class BeamlineSetup(HardwareObject):
         self._object_by_path = {}
         self._plate_mode = False
 
-        # For hardware objects that we would like to access as:
-        # self.<role_name>_hwrobj. Just to make it more elegant syntactically.
-
-        #self._role_list = ['transmission', 'diffractometer', 'sample_changer', 'plate_manipulator',
-        #                   'resolution', 'shape_history', 'session', 'beam_info',
-        #                   'data_analysis', 'workflow', 'lims_client',
-        #                   'omega_axis', 'kappa_axis', 'kappa_phi_axis',
-        #                   'collect', 'energy', 'xrf_scan', 'detector', 'energyscan']
-
     def init(self):
         """
         Framework 2 init, inherited from HardwareObject.
         """
- 
-        # 2015.10.05. Suggestion to read roles directly from xml, because 
-        #             qt3/qt4/web gui might use different hwboj
-  
+
+        self.sample_changer_hwobj = None
+        self.plate_manipulator_hwobj = None
+
         for role in self.getRoles():
             self._get_object_by_role(role)
 
@@ -100,19 +91,15 @@ class BeamlineSetup(HardwareObject):
         """
         self._plate_mode = state
 
-    def in_plate_mode(self):
-        """
-        :returns: True if plates are used otherwise False
-        :rtype: bool
-        """
-        return self._plate_mode
-
     def detector_has_shutterless(self):
         """
         :returns: True if the detector is capable of shuterless.
         :rtype: bool
         """
-        return self.detector_hwobj.has_shutterless()
+        try:
+            return self.detector_hwobj.has_shutterless()
+        except AttributeError:
+            return False
 
     def tunable_wavelength(self):
         """
@@ -173,6 +160,11 @@ class BeamlineSetup(HardwareObject):
         overlap = round(float(self[parent_key].getProperty('overlap')), 2)
         exp_time = round(float(self[parent_key].getProperty('exposure_time')), 4)
         num_passes = int(self[parent_key].getProperty('number_of_passes'))
+        shutterless = self.detector_has_shutterless()
+        try:
+            detector_mode = self.detector_hwobj.default_mode() 
+        except AttributeError:
+            detector_mode = None
 
         acq_parameters.first_image = int(img_start_num)
         acq_parameters.num_images = int(num_images)
@@ -277,6 +269,11 @@ class BeamlineSetup(HardwareObject):
         overlap = round(float(self[parent_key].getProperty('overlap')), 2)
         exp_time = round(float(self[parent_key].getProperty('exposure_time')), 4)
         num_passes = int(self[parent_key].getProperty('number_of_passes'))
+        shutterless = self.detector_has_shutterless()
+        try:
+            detector_mode = self.detector_hwobj.default_mode() 
+        except AttributeError:
+            detector_mode = None
 
         acq_parameters.first_image = img_start_num
         acq_parameters.num_images = num_images
@@ -351,7 +348,14 @@ class BeamlineSetup(HardwareObject):
         path_template.wedge_prefix = ''
         path_template.run_number = self[parent_key].getProperty('run_number')
         path_template.suffix = self.session_hwobj["file_info"].getProperty('file_suffix')
+
         path_template.precision = '04'
+        try:
+           if self.session_hwobj["file_info"].getProperty('precision'):
+               path_template.precision = eval(self.session_hwobj["file_info"].getProperty('precision'))
+        except:
+           pass
+        
         path_template.start_num = int(self[parent_key].getProperty('start_image_number'))
         path_template.num_files = int(self[parent_key].getProperty('number_of_images'))
 

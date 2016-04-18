@@ -97,7 +97,7 @@ class EMBLDetector(AbstractDetector, HardwareObject):
         if self.chan_roi_mode is not None:
             self.chan_roi_mode.connectSignal('update', self.roi_mode_changed)
         else:
-            logging.getLogger().error("Detector: Collect mode channel not defined")
+            logging.getLogger().error("Detector: ROI mode channel not defined")
 
         self.chan_frame_rate = self.getChannelObject('chanFrameRate')
         if self.chan_frame_rate is not None:
@@ -116,8 +116,11 @@ class EMBLDetector(AbstractDetector, HardwareObject):
  
         self.pixel_min = self.getProperty("px_min")
         self.pixel_max = self.getProperty("px_max")
-        
-        self.roi_modes = eval(self.getProperty("roiModes"))
+
+        try:        
+           self.roi_modes = eval(self.getProperty("roiModes"))
+        except:
+           self.roi_modes = ()
 
     def get_distance(self):
         """
@@ -253,7 +256,8 @@ class EMBLDetector(AbstractDetector, HardwareObject):
         """
         Descript. :
         """
-        self.emit('detectorModeChanged', (self.roi_mode, )) 
+        if self.roi_mode:
+            self.emit('detectorModeChanged', (self.roi_mode, )) 
         temp = self.chan_temperature.getValue()
         self.emit('temperatureChanged', (temp, temp < self.temp_treshold))
         hum = self.chan_humidity.getValue()

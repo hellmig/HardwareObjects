@@ -52,6 +52,16 @@ class QueueManager(HardwareObject, QueueEntryContainer):
         self._disable_collect = False
         self._is_stopped = False
 
+    def __getstate__(self):
+        d = dict(self.__dict__)
+        d['_root_task'] = None
+        d['_paused_event'] = None  
+        return d      
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+        self._paused_event = gevent.event.Event()
+
     def enqueue(self, queue_entry):
         """
         Method inherited from QueueEntryContainer, enqueues the QueueEntry
@@ -126,6 +136,7 @@ class QueueManager(HardwareObject, QueueEntryContainer):
             return
         
         self.emit('centringAllowed', (False, ))
+        self.emit('queue_execute_started', (entry, ))
         self._current_queue_entries.append(entry)
 
         logging.getLogger('queue_exec').info('Calling execute on: ' + str(entry))
@@ -324,6 +335,9 @@ class QueueManager(HardwareObject, QueueEntryContainer):
         :rtype: NoneType
         """
         self._queue_entry_list = []
+
+    def show_workflow_tab(self):
+        self.emit('show_workflow_tab')
 
     def show_workflow_tab(self):
         self.emit('show_workflow_tab')

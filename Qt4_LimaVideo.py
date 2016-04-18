@@ -17,17 +17,18 @@
 #  You should have received a copy of the GNU General Public License
 #  along with MXCuBE.  If not, see <http://www.gnu.org/licenses/>.
 
-
 import os
 import time
 import logging
 import gevent
+import numpy as np
 
 from PyQt4 import QtGui
 from PyQt4 import QtCore
 
 from Lima import Core 
 from Lima import Prosilica
+
 
 from HardwareRepository.BaseHardwareObjects import Device
 
@@ -41,9 +42,6 @@ class Qt4_LimaVideo(Device):
         Descript. :
         """
         Device.__init__(self, name)
-        self.scaling = None
-        self.scaling_type = None 
-        self.do_scaling = None
         self.force_update = None
         self.cam_type = None
         self.cam_address = None
@@ -55,6 +53,7 @@ class Qt4_LimaVideo(Device):
         self.gain_exists = None
         self.gamma_exists = None
 
+        self.qimage = None
         self.image_format = None
         self.image_dimensions = None
 
@@ -142,19 +141,18 @@ class Qt4_LimaVideo(Device):
         """
         Descript. :
         """
-        return self.image_dimensions[0]
+        return int(self.image_dimensions[0])
 	
     def getHeight(self):
         """
         Descript. :
         """
-        return self.image_dimensions[1]
+        return int(self.image_dimensions[1])
 
     def do_image_polling(self, sleep_time):
         """
         Descript. :
         """
-        self.do_scaling = True 
         while self.video.getLive():
             self.get_new_image()
             time.sleep(sleep_time)
@@ -172,8 +170,8 @@ class Qt4_LimaVideo(Device):
         """
         Descript. :
         """
-        self.do_scaling = True
-
+        pass
+ 
     def get_new_image(self):
         """
         Descript. :
@@ -181,8 +179,58 @@ class Qt4_LimaVideo(Device):
         image = self.video.getLastImage()
         if image.frameNumber() > -1:
             raw_buffer = image.buffer()	
-            qimage = QtGui.QImage(raw_buffer, image.width(),image.height(), QtGui.QImage.Format_RGB888)
+            qimage = QtGui.QImage(raw_buffer, image.width(), image.height(), 
+                                  QtGui.QImage.Format_RGB888)
             if self.cam_mirror is not None:
                 qimage = qimage.mirrored(self.cam_mirror[0], self.cam_mirror[1])     
-            qimage = QtGui.QPixmap(qimage)
-            self.emit("imageReceived", qimage)
+            qpixmap = QtGui.QPixmap(qimage)
+            self.emit("imageReceived", qpixmap)
+            return qimage
+
+    def save_snapshot(self, filename, image_type='PNG'):
+        qimage = self.get_new_image() 
+        qimage.save(filename, image_type) 
+
+    def get_snapshot(self, bw=None, return_as_array=True):
+        qimage = self.get_new_image()
+        if return_as_array:
+            qimage = qimage.convertToFormat(4)
+            ptr = qimage.bits()
+            ptr.setsize(qimage.byteCount())
+            return np.array(ptr).reshape(qimage.height(), qimage.width(), 4)
+            
+        else:
+            if bw:
+                return qimage.convertToFormat(QtGui.QImage.Format_Mono)
+            else:
+                return qimage
+
+    def get_contrast(self):
+        return
+
+    def set_contrast(self, contrast_value):
+        return
+
+    def get_brightness(self):
+        return
+
+    def set_brightness(self, brightness_value):
+        return
+
+    def get_gain(self):
+        return
+
+    def set_gain(self, gain_value):
+        return
+
+    def get_gamma(self):
+        return
+
+    def set_gamma(self, gamma_value):
+        return
+
+    def get_exposure_time(self):
+        return
+
+    def set_exposure_time(self, exposure_time_value):
+        return

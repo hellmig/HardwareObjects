@@ -45,7 +45,7 @@ class DetectorMockup(Equipment):
         self.tolerance = self.getProperty("tolerance")
         self.temp_treshold = self.getProperty("tempThreshold") 
         self.hum_treshold = self.getProperty("humidityThreshold")
-        
+
         try:
            self.detector_modes_dict = eval(self.getProperty("detectorModes"))
         except:

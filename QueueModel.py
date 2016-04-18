@@ -34,6 +34,13 @@ class QueueModel(HardwareObject):
         #self._selected_model = self._ispyb_model
         self._selected_model = self._sc_one_model
 
+    def __getstate__(self):
+        d = dict(self.__dict__)
+        return d
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+
     # Framework-2 method, inherited from HardwareObject and called
     # by the framework after the object has been initialized.
     def init(self):
@@ -229,7 +236,7 @@ class QueueModel(HardwareObject):
 
         :returns: None
         :rtype: None
-        """
+        """        
         view_item._data_model = task_model
         cls = queue_entry.MODEL_QUEUE_ENTRY_MAPPINGS[task_model.__class__]
         qe = cls(view_item, task_model)

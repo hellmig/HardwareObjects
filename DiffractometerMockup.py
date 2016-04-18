@@ -16,7 +16,7 @@ from HardwareRepository import HardwareRepository
 from HardwareRepository.TaskUtils import *
 from HardwareRepository.BaseHardwareObjects import Equipment
 
-from Qub.Tools import QubImageSave
+#from Qub.Tools import QubImageSave
 
 class myimage:
     """
@@ -94,7 +94,7 @@ class DiffractometerMockup(Equipment):
         self.current_positions_dict = None
         self.current_phase = None
         self.centring_methods = None
-        self.centring_status = None
+        self.centring_status = {"valid":None,"startTime":None,"endTime":None,"motors":None,"accepted":None,"method":None,"images":None}
         self.centring_time = None
         self.user_confirms_centring = None
         self.user_clicked_event = None
@@ -113,6 +113,10 @@ class DiffractometerMockup(Equipment):
         self.getCentringStatus = self.get_centring_status
         self.takeSnapshots = self.take_snapshots
         self.moveMotors = self.move_motors
+        self.start3ClickCentring = self.start_3Click_centring
+        self.startAutoCentring = self.start_automatic_centring
+     
+        self.centringStatus = self.centring_status
 
     def init(self):
         """
@@ -134,6 +138,7 @@ class DiffractometerMockup(Equipment):
                                        'focus' : 0, 'kappa': 0, 'kappa_phi': 0,
                                        'beam_x': 0, 'beam_y': 0} 
         self.centring_status = {"valid": False}
+
         self.centring_time = 0
         self.user_confirms_centring = True
         self.fast_shutter_is_open = False
@@ -149,6 +154,9 @@ class DiffractometerMockup(Equipment):
         self.sampleXMotor = self.getDeviceByRole('sampx')
         self.sampleYMotor = self.getDeviceByRole('sampy')
         self.camera_hwobj = self.getDeviceByRole('camera')
+        self.beam_info_hwobj = self.getObjectByRole('beam_info')
+        self.camera = self.camera_hwobj
+        self.beam_info = self.beam_info_hwobj
 
         if self.phiMotor is not None:
             self.connect(self.phiMotor, 'stateChanged', self.phiMotorStateChanged)
@@ -170,8 +178,6 @@ class DiffractometerMockup(Equipment):
         else:
             logging.getLogger("HWR").error('MiniDiff: Sampx motor is not defined')
 
-        self.beam_info_hwobj = HardwareRepository.HardwareRepository().\
-                                getHardwareObject(self.getProperty("beam_info"))
         if self.beam_info_hwobj is not None:
             self.connect(self.beam_info_hwobj, 'beamPosChanged', self.beam_position_changed)
         else:
@@ -201,8 +207,8 @@ class DiffractometerMockup(Equipment):
         return False
 
     def in_plate_mode(self):
-        #TODO head detection should be used to detect if in plate mode 
-	return True
+        #currently not used for mockup version
+	return False
 
     def toggle_fast_shutter(self):
         self.fast_shutter_is_open = not self.fast_shutter_is_open
@@ -261,10 +267,20 @@ class DiffractometerMockup(Equipment):
         """
         return "ready"
 
+    def saveCurrentPos(self):
+        random_num = random.random()
+        centred_pos_dir = {'phiy': random_num, 'phiz': random_num * 2,
+                           'sampx': random_num * 3, 'sampy': random_num * 4,
+                           'zoom': 8.53, 'phi': 311.1, 'focus': -0.42,
+                           'kappa': 0.0, 'kappa_phi': 0.0}
+        self.centring_status["motors"] = centred_pos_dir
+        self.acceptCentring()
+
     def manual_centring(self):
         """
         Descript. :
         """
+
         self.user_clicked_event = AsyncResult()
         x, y = self.user_clicked_event.get()
         last_centred_position[0] = x
@@ -436,6 +452,9 @@ class DiffractometerMockup(Equipment):
         """
         Descript. :
         """
+        self.emit_progress_message("Auto centring")
+        self.emit_centring_started(DiffractometerMockup.C3D_MODE)
+        self.emit('centringSuccessful')
         return
 
     def motor_positions_to_screen(self, centred_positions_dict):

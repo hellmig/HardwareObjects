@@ -60,6 +60,7 @@ class Session(HardwareObject):
         queue_model_objects.PathTemplate.set_data_base_path(self.base_directory)
         queue_model_objects.PathTemplate.set_archive_path(self['file_info'].getProperty('archive_base_directory'),
                                                           self['file_info'].getProperty('archive_folder'))
+        queue_model_objects.PathTemplate.set_path_template_style(self.getProperty('synchrotron_name'))
 
 
     def get_base_data_directory(self):
@@ -74,7 +75,7 @@ class Session(HardwareObject):
         user_category = ''
         directory = ''
 
-        if self.synchrotron_name == "PETRA":
+        if self.synchrotron_name == "EMBL-HH":
             start_time = time.strftime("%Y%m%d")
             if os.getenv("SUDO_USER"):
                 user = os.getenv("SUDO_USER")

@@ -18,8 +18,7 @@
 #  along with MXCuBE.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-
-#from PyQt4.QtCore import SIGNAL
+import gevent
 
 from HardwareRepository.BaseHardwareObjects import Device
 from HardwareRepository import HardwareRepository
@@ -113,18 +112,6 @@ class TINEMotor(Device):
         self.moveConditions = self.getProperty("moveConditions")
         self.moveHOSignals = self.getProperty("moveHOSignals")
       
-        """try:
-            hoSignals = eval(self.moveHOSignals)
-            for ho in hoSignals:
-                hobj = HardwareRepository.HardwareRepository().getHardwareObject("/%s" % ho)
-                if hobj is None:
-                    logging.getLogger("HWR").error('TINEMotor: invalid %s hardware object' % ho)
-                else:
-                    exec("self.%s=hobj" % ho)
-                    self.connect(eval("self.%s" % ho), SIGNAL(hoSignals[ho]), self.getState)
-        except:
-            pass"""
-
     def isConnected(self):
         """
         Descript. :
@@ -213,7 +200,7 @@ class TINEMotor(Device):
         """
         self.cmd_stop_axis()
     
-    def move(self, target):
+    def move(self, target, wait=False):
         """
         Descript. :
         """
@@ -221,6 +208,9 @@ class TINEMotor(Device):
         if self.chan_state is not None:
             self.chan_state.setOldValue('moving')
         self.cmd_set_position(target)
+
+        if wait:
+            self._waitDeviceReady(30)  
 
     def __changeMotorState(self, state):
         """
@@ -282,3 +272,11 @@ class TINEMotor(Device):
     def update_values(self):    
         self.emit('limitsChanged', (self.limits, ))
         self.emit('positionChanged', (self.current_position, ))
+
+    def _isDeviceReady(self):
+        return self.motorState == READY
+
+    def _waitDeviceReady(self,timeout=None):
+        with gevent.Timeout(timeout, Exception("Timeout waiting for device ready")):
+            while not self._isDeviceReady():
+                gevent.sleep(0.05)

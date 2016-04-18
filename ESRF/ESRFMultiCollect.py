@@ -203,13 +203,18 @@ class PixelDetector:
 
     @task
     def start_acquisition(self, exptime, npass, first_frame):
-      if not first_frame and self.shutterless:
-        pass 
-      else:
-        if self._detector:
-            self._detector.start_acquisition()
+        try:
+            self.collect_obj.getObjectByRole("detector_cover").set_out()
+        except:
+            pass
+
+        if not first_frame and self.shutterless:
+            pass 
         else:
-            self.execute_command("start_acquisition")
+            if self._detector:
+                self._detector.start_acquisition()
+            else:
+                self.execute_command("start_acquisition")
 
     @task
     def no_oscillation(self, exptime):
@@ -290,7 +295,8 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
         except IndexError:
           undulators = []
 
-        self.setBeamlineConfiguration(directory_prefix = self.getProperty("directory_prefix"),
+        self.setBeamlineConfiguration(synchrotron_name = "ESRF",
+                                      directory_prefix = self.getProperty("directory_prefix"),
                                       default_exposure_time = self.bl_control.detector.getProperty("default_exposure_time"),
                                       minimum_exposure_time = self.bl_control.detector.getProperty("minimum_exposure_time"),
                                       detector_fileext = self.bl_control.detector.getProperty("file_suffix"),
@@ -470,10 +476,8 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
           i+=1
 
         mosflm_input_file_dirname = "mosflm_%s_run%s_%d" % (prefix, run_number, i)
-        mosflm_directory = os.path.join(process_directory, mosflm_input_file_dirname)
 
         hkl2000_dirname = "hkl2000_%s_run%s_%d" % (prefix, run_number, i)
-        hkl2000_directory = os.path.join(process_directory, hkl2000_dirname)
 
         self.raw_data_input_file_dir = os.path.join(files_directory, "process", xds_input_file_dirname)
         self.mosflm_raw_data_input_file_dir = os.path.join(files_directory, "process", mosflm_input_file_dirname)
@@ -483,13 +487,11 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
           self.create_directories(dir)
           logging.info("Creating XDS processing input file directory: %s", dir)
           os.chmod(dir, 0777)
-        for dir in (self.mosflm_raw_data_input_file_dir, mosflm_directory):
-          self.create_directories(dir)
-          logging.info("Creating MOSFLM processing input file directory: %s", dir)
-          os.chmod(dir, 0777)
-        for dir in (self.raw_hkl2000_dir, hkl2000_directory):
-          self.create_directories(dir)
-          os.chmod(dir, 0777)
+
+        for dir in (self.mosflm_raw_data_input_file_dir, self.raw_hkl2000_dir):
+            self.create_directories(dir)
+            logging.info("Creating processing input file directory: %s", dir)
+            os.chmod(dir, 0777)
  
         try: 
           try: 
@@ -500,7 +502,7 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
         except:
             logging.exception("Could not create processing file directory")
 
-        return xds_directory, mosflm_directory, hkl2000_directory
+        return xds_directory, "", ""
 
 
     @task
@@ -516,7 +518,7 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
             r = conn.getresponse()
 
             if r.status != 200:
-                logging.error("Could not create input file")
+                logging.error("Could not create hkl input file")
             else:
                 hkl_file.write(r.read())
             hkl_file.close()
@@ -528,7 +530,7 @@ class ESRFMultiCollect(AbstractMultiCollect, HardwareObject):
           xds_file = open(xds_input_file, "w")
           r = conn.getresponse()
           if r.status != 200:
-            logging.error("Could not create input file")
+            logging.error("Could not create xds input file")
           else:
             xds_file.write(r.read())
           xds_file.close()
