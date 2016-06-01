@@ -3,6 +3,7 @@ import math
 import logging
 import time
 import gevent
+import PyTango
 
 class MD2v4TimeoutError(Exception):
     pass
@@ -25,8 +26,8 @@ class MD2v4_Motor(Device):
         self.offset = self.getProperty("offset")
         self.position_attr = self.getChannelObject("motor_attr")
         self.position_attr.connectSignal("update", self.motorPositionChanged)
-        #self.state_attr = self.getChannelObject("motor_state")
-        #self.state_attr.connectSignal("update", self.globalStateChanged)
+        self.state_attr = self.getChannelObject("device_state")
+        # self.state_attr.connectSignal("update", self.globalStateChanged)
         self.motors_state_attr = self.getChannelObject("motor_states")
         self.motors_state_attr.connectSignal("update", self.updateMotorState)
         self._motor_abort = self.getCommandObject("motor_abort")
@@ -104,7 +105,7 @@ class MD2v4_Motor(Device):
     def waitEndOfMove(self, timeout=None):
         with gevent.Timeout(timeout):
            time.sleep(0.1)
-           while self.motorState == MD2v4_Motor.MOVING:
+           while (self.state_attr.getValue() == PyTango.DevState.MOVING) or (self.motorState == MD2v4_Motor.MOVING):
               time.sleep(0.1) 
 
     def syncMove(self, position, timeout=None):

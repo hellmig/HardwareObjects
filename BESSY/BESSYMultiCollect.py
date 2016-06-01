@@ -273,6 +273,16 @@ class BESSYMultiCollect(AbstractMultiCollect, HardwareObject):
     def init(self):
         self.run_without_loop = False
 
+        #self.diffractometer_hwobj = self.getObjectByRole("diffractometer")
+        self.lims_client_hwobj = self.getObjectByRole("dbserver")
+        #self.machine_current_hwobj = self.getObjectByRole("machine_current")
+        #self.energy_hwobj = self.getObjectByRole("energy")
+        #self.resolution_hwobj = self.getObjectByRole("resolution")
+        #self.transmission_hwobj = self.getObjectByRole("transmission")
+        self.detector_hwobj = self.getObjectByRole("detector")
+        #self.beam_info_hwobj = self.getObjectByRole("beam_info")
+        #self.autoprocessing_hwobj = self.getObjectByRole("auto_processing")
+
         self.setControlObjects(diffractometer = self.getObjectByRole("diffractometer"),
                                sample_changer = self.getObjectByRole("sample_changer"),
                                lims = self.getObjectByRole("dbserver"),
