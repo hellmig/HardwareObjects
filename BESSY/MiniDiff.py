@@ -17,6 +17,8 @@ import sample_centring
 import numpy
 import queue_model_objects_v1 as qmo
 
+import StringIO
+
 class myimage:
     def __init__(self, drawing):
         self.drawing = drawing
@@ -72,7 +74,7 @@ def set_light_in(light, light_motor, zoom):
            time.sleep(0.5)
 
 
-def take_snapshots(number_of_snapshots, light, light_motor, phi, zoom, drawing):
+def take_snapshots(number_of_snapshots, camera, light, light_motor, phi, zoom):
   if number_of_snapshots <= 0:
     return
 
@@ -80,18 +82,28 @@ def take_snapshots(number_of_snapshots, light, light_motor, phi, zoom, drawing):
 
   set_light_in(light, light_motor, zoom)
 
-  for i, angle in enumerate([-90]*number_of_snapshots):
-     logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d", i+1)
+  #for i, angle in enumerate([0]+[-90]*(number_of_snapshots-1)):
+  for i in range(number_of_snapshots):
      # centredImages.append((phi.getPosition(),str(myimage(drawing))))
-     phi.syncMoveRelative(angle)
+     image = camera.takeSnapshot()
+     buffer = StringIO.StringIO()
+     image.save(buffer, "JPEG")
+     buffer.seek(0)
+     image_str =  buffer.read()
+     phi_position = phi.getPosition()
+     logging.getLogger("HWR").info("MiniDiff: taking snapshot #%d at phi = %f deg.", i+1, phi_position)
+     centredImages.append((phi_position, image_str))
+     phi.syncMoveRelative(90)
 
-  centredImages.reverse() # snapshot order must be according to positive rotation direction
+  # centredImages.reverse() # snapshot order must be according to positive rotation direction
 
   return centredImages
 
 
 class MiniDiff(Equipment):
     MANUAL3CLICK_MODE = "Manual 3-click"
+    CENTRING_METHOD_MANUAL = "Manual 3-click"
+    CENTRING_METHOD_AUTO = "Computer automatic"
     C3D_MODE = "Computer automatic"
     #MOVE_TO_BEAM_MODE = "Move to Beam"
 
@@ -247,6 +259,9 @@ class MiniDiff(Equipment):
         #Agree on a correct method name, inconsistent arguments for moveToBeam, disabled temporarily
         #self.move_to_coord = self.moveToBeam()
 
+        self.move_to_centred_position = self.moveToCentredPosition
+
+
     def save_snapshot(self, filename):
         set_light_in(self.lightWago, self.lightMotor, self.zoomMotor)
         print "MiniDiff: taking snapshots disabeld until Qub with Qt4 resolved."
@@ -396,7 +411,7 @@ class MiniDiff(Equipment):
         return self.centringMethods.keys()
 
 
-    def startCentringMethod(self,method,sample_info=None):
+    def startCentringMethod(self,method,sample_info=None,wait=False):
         if not self.do_centring:
             self.emitCentringStarted(method)
             def fake_centring_procedure():
@@ -608,6 +623,41 @@ class MiniDiff(Equipment):
         else:
             logging.getLogger("HWR").debug("MiniDiff: trying to emit centringSuccessful outside of a centring")
 
+#    def convert_from_obj_to_name(self, motor_pos):
+#        motors = {}
+#        for motor_role in ('phiy', 'phiz', 'sampx', 'sampy', 'zoom',
+#                           'phi', 'focus', 'kappa', 'kappa_phi'):
+#            mot_obj = self.getObjectByRole(motor_role)
+#            try:
+#               motors[motor_role] = motor_pos[mot_obj]
+#            except KeyError:
+#               motors[motor_role] = mot_obj.getPosition()
+#        #motors["beam_x"] = (self.beam_position[0] - \
+#        #                    self.zoom_centre['x'] )/self.pixels_per_mm_y
+#        #motors["beam_y"] = (self.beam_position[1] - \
+#        #                    self.zoom_centre['y'] )/self.pixels_per_mm_x
+#        return motors
+#
+#    def emitCentringSuccessful(self):
+#        """
+#        Descript. :
+#        """
+#        if self.currentCentringProcedure is not None:
+#            curr_time = time.strftime("%Y-%m-%d %H:%M:%S")
+#            self.centringStatus["endTime"] = curr_time
+#            motor_pos = self.currentCentringProcedure.get()
+#            motors = self.convert_from_obj_to_name(motor_pos)
+#
+#            self.centringStatus["motors"] = motors
+#            self.centringStatus["method"] = self.currentCentringMethod
+#            self.centringStatus["valid"] = True
+#           
+#            method = self.currentCentringMethod
+#            self.emit('centringSuccessful', (method, self.getCentringStatus()))
+#            self.currentCentringMethod = None
+#            self.currentCentringProcedure = None
+#        else:
+#            logging.getLogger("HWR").debug("EMBLMiniDiff: trying to emit centringSuccessful outside of a centring")
 
     def emitProgressMessage(self,msg=None):
         #logging.getLogger("HWR").debug("%s: %s", self.name(), msg)
@@ -649,7 +699,7 @@ class MiniDiff(Equipment):
         # TODO: remove this sleep, the motors states should
         # be MOVING since the beginning (or READY if move is
         # already finished) 
-        time.sleep(1)
+        time.sleep(0.1)
  
         while not all([m.getState() == m.READY for m in motor.itervalues() if m is not None]):
            time.sleep(0.1)
@@ -658,7 +708,8 @@ class MiniDiff(Equipment):
     def takeSnapshots(self, image_count, wait=False):
         self.camera.forceUpdate = True
         
-        snapshotsProcedure = gevent.spawn(take_snapshots, image_count, self.lightWago, self.lightMotor ,self.phiMotor,self.zoomMotor,self._drawing)
+        #snapshotsProcedure = gevent.spawn(take_snapshots, image_count, self.camera, self.lightWago, self.lightMotor ,self.phiMotor,self.zoomMotor,self._drawing)
+        snapshotsProcedure = gevent.spawn(take_snapshots, image_count, self.camera, self.lightWago, self.lightMotor ,self.phiMotor,self.zoomMotor)
         self.emit('centringSnapshots', (None,))
         self.emitProgressMessage("Taking snapshots")
         self.centringStatus["images"]=[]
