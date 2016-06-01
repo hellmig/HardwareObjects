@@ -957,7 +957,7 @@ class CharacterisationGroupQueueEntry(BaseQueueEntry):
         if self.char_qe: 
             self.status = self.char_qe.status
         else:
-            self.status = self.dc_qe
+            self.status = self.dc_qe.status
         BaseQueueEntry.post_execute(self)
 
 
