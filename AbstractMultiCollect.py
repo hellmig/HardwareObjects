@@ -547,11 +547,12 @@ class AbstractMultiCollect(object):
               snapshot_i = 1
               snapshots = []
               for img in centring_info["images"]:
-                img_phi_pos = img[0]
+                img_phi_pos = int(round(img[0], 0))
                 img_data = img[1]
-                snapshot_filename = "%s_%s_%s.snapshot.jpeg" % (file_parameters["prefix"],
+                snapshot_filename = "%s_%s_%s_%sdeg.snapshot.jpeg" % (file_parameters["prefix"],
                                                                 file_parameters["run_number"],
-                                                                snapshot_i)
+                                                                snapshot_i,
+                                                                img_phi_pos)
                 full_snapshot = os.path.join(snapshot_directory,
                                              snapshot_filename)
 
