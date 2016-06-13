@@ -59,6 +59,7 @@ class Energy(Equipment):
             self.energy_motor.connect('stateChanged', self.energyStateChanged)
 
         self.get_energy_limits = self.getEnergyLimits
+        self.get_wavelength_limits = self.getWavelengthLimits
         self.can_move_energy = self.canMoveEnergy
 
     """

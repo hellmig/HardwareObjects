@@ -260,6 +260,8 @@ class MiniDiff(Equipment):
         #self.move_to_coord = self.moveToBeam()
 
         self.move_to_centred_position = self.moveToCentredPosition
+        # 2016-06-08-bessy-mh: move to beam operation currently disabled by overwritten method in MD2v4.py
+        self.move_to_beam = self.moveToBeam
 
 
     def save_snapshot(self, filename):

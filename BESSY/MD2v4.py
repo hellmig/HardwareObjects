@@ -141,3 +141,5 @@ class MD2v4(MiniDiff.MiniDiff):
     def in_plate_mode(self):
 	return False
 
+    def move_to_beam(self, x, y):
+        logging.getLogger("HWR").info("MD2v4: \"move to beam\" functionality not implemented yet.")

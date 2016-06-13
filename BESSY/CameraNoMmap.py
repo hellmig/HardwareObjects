@@ -395,9 +395,13 @@ class CameraNoMmap(BaseHardwareObjects.Device):
                          img_type="L"
                        try:
                          if kwargs.get("bw", False) and img_type=="RGB":
-                           img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg).convert("L")
+                           # 2016-06-08-bessy-mh: change call frombuffer for maximum portability with future versions of the PIL
+                           # img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg).convert("L")
+                           img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg, "raw", img_type, 0, 1).convert("L")
                          else:
-                           img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg)
+                           # 2016-06-08-bessy-mh: change call frombuffer for maximum portability with future versions of the PIL
+                           # img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg)
+                           img = Image.frombuffer(img_type, (self.getWidth(), self.getHeight()), rawimg, "raw", img_type, 0, 1)
                          img = img.transpose(Image.FLIP_TOP_BOTTOM)
                          #img.save(*args)
                        except:

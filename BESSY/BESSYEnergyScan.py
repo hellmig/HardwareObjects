@@ -32,7 +32,7 @@ class TunableEnergy:
     
 class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
     def __init__(self, name, tunable_bl):
-        print "BESSYEnergyScan.__init__"
+        # print "BESSYEnergyScan.__init__"
         AbstractEnergyScan.__init__(self)
         HardwareObject.__init__(self, name)
         self._tunable_bl = tunable_bl
