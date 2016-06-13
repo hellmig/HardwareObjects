@@ -32,6 +32,7 @@ from collections import namedtuple
 from queue_model_enumerables_v1 import *
 from HardwareRepository.HardwareRepository import dispatcher
 
+
 status_list = ['SUCCESS','WARNING', 'FAILED']
 QueueEntryStatusType = namedtuple('QueueEntryStatusType', status_list)
 QUEUE_ENTRY_STATUS = QueueEntryStatusType(0,1,2,)
@@ -1619,7 +1620,12 @@ def mount_sample(beamline_setup_hwobj,
                 if centring_method == CENTRING_METHOD.MANUAL:
                     log.warning("Manual centring used, waiting for" +\
                                 " user to center sample")
-                    dm.startCentringMethod(dm.MANUAL3CLICK_MODE)
+                    try:
+                       # try to use Qt4_GraphicsManager's centring method with proper graphics handling
+                       beamline_setup_hwobj.shape_history_hwobj.start_centring(True)
+                    except AttributeError:
+                       # no shape_history_hwobj or centring method not available
+                       dm.startCentringMethod(dm.MANUAL3CLICK_MODE)
                 elif centring_method == CENTRING_METHOD.LOOP:
                     dm.startCentringMethod(dm.C3D_MODE)
                     log.warning("Centring in progress. Please save" +\
@@ -1628,7 +1634,12 @@ def mount_sample(beamline_setup_hwobj,
                     log.info("Centring sample, please wait.")
                     dm.startCentringMethod(dm.C3D_MODE)
                 else:
-                    dm.startCentringMethod(dm.MANUAL3CLICK_MODE)
+                    try:
+                       # try to use Qt4_GraphicsManager's centring method with proper graphics handling
+                       beamline_setup_hwobj.shape_history_hwobj.start_centring(True)
+                    except AttributeError:
+                       # no shape_history_hwobj or centring method not available
+                       dm.startCentringMethod(dm.MANUAL3CLICK_MODE)
 
                 view.setText(1, "Centring !")
                 centring_result = async_result.get()
