@@ -306,11 +306,11 @@ class Qt4_GraphicsManager(HardwareObject):
         self.emit("centringFailed", method, centring_status)
         self.emit("infoMsg", "")
 
-    def diffractometer_pixels_per_mm_changed(self, pixels_per_mm, arg = None):
+    def diffractometer_pixels_per_mm_changed(self, pixels_per_mm):
         """
         Descript. :
         """
-        # print "** diffractometer_pixels_per_mm_changed ** >", pixels_per_mm, "<", type(pixels_per_mm), arg, type(arg)
+        # print "** diffractometer_pixels_per_mm_changed ** >", pixels_per_mm, "<", type(pixels_per_mm)
         if type(pixels_per_mm) in (list, tuple):
             if pixels_per_mm != self.pixels_per_mm:
                 self.pixels_per_mm = pixels_per_mm
