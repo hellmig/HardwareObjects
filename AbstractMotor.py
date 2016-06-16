@@ -23,7 +23,7 @@ Descript. : AbstractMotor represent motor.
 
 import abc
 
-class AbstractMotor(object):      
+class AbstractMotor(object):
     __metaclass__ = abc.ABCMeta
 
     (NOTINITIALIZED, UNUSABLE, READY, MOVESTARTED, MOVING, ONLIMIT) = (0,1,2,3,4,5)
@@ -41,83 +41,89 @@ class AbstractMotor(object):
         """
         Descript. :
         """
-        self.motor_name = None
         self.motor_state = AbstractMotor.NOTINITIALIZED
  
         self.static_limits = (-1E4, 1E4)
         self.limits = (None, None)
 
+        #generic method used by the beamline setup
+        self.get_value = self.getPosition
+
     def getMotorMnemonic(self):
         """
         Descript. :
         """
-        return self.motor_name
+        return
 
     def updateState(self):
         """
         Descript. :
         """
-        self.setIsReady(self.motor_state > MicrodiffMotor.UNUSABLE)
+        self.setIsReady(self.motor_state > AbstractMotor.UNUSABLE)
 
     @abc.abstractmethod
     def getState(self):
         """
-        Descript. : return motor state
+        Return motor state
         """
         return
-    
+
     @abc.abstractmethod
     def getLimits(self):
         """
-        Descript. : returns motor limits. If no limits channel defined then
+        Returns motor limits. If no limits channel defined then
                     static_limits is returned
         """
         return
- 
+
     @abc.abstractmethod
     def getPosition(self):
         """
-        Descript. :
+        Read the motor user position.
         """
         return
 
     def getDialPosition(self):
         """
-        Descript. :
+        Read the motor dial position.
         """
         return self.getPosition()
 
     @abc.abstractmethod
-    def move(self, absolute_position):
+    def move(self, position, wait=False, timeout=None):
         """
-        Descript. :
-        """
-        return
-
-    @abc.abstractmethod
-    def moveRelative(self, relative_position):
-        """
-        Descript. :
+        Move to absolute position. Wait the move to finish (True/False)
         """
         return
 
-    @abc.abstractmethod
+    def moveRelative(self, position, wait=False, timeout=None):
+        """
+        Move to relative position. Wait the move to finish (True/False)
+        """
+        return
+
     def syncMove(self, position, timeout=None):
         """
-        Descript. :
+        Deprecated method - corresponds to move until move finished.
         """
-        return
+        self.move(position, timeout=timeout, wait=True)
 
-    @abc.abstractmethod
-    def syncMoveRelative(self, relative_position, timeout=None):
+    def syncMoveRelative(self, position, timeout=None):
         """
-        Descript. :
+        Deprecated method - corresponds to moveRelative until move finished.
         """
-        return
+        self.moveRelative(position, timeout=timeout, wait=True)
 
     @abc.abstractmethod
     def stop(self):
         """
-        Descript. :
+        Stop the motor
         """
         return
+
+    def motorIsMoving(self):
+        """
+        Return True if the motor is moving, False otherwise
+        """
+        return
+

@@ -29,6 +29,8 @@ class MD2v4(MiniDiff.MiniDiff):
         #    self.beamPosX.connectSignal("update", self.beamPositionChanged)
         self.beamPosY = self.getChannelObject("beam_pos_y")
         self.state = self.getChannelObject("state")
+        if self.state is not None:
+            self.state.connectSignal("update", self.stateChanged)
         self.phasePosition = self.getChannelObject("phase_position")
         self.centringClickCmd = self.getCommandObject("centring_click_cmd")
         self.startCentringPhaseCmd = self.getCommandObject("start_centring_phase_cmd")
@@ -61,6 +63,7 @@ class MD2v4(MiniDiff.MiniDiff):
         self.get_centring_status = self.getCentringStatus 
         self.take_snapshots = self.takeSnapshots 
         self.move_motors = self.moveMotors 
+        self.is_ready = self.isReady
         # ---------------------
 
         #terminal_server.export("udiff", self)
@@ -77,6 +80,15 @@ class MD2v4(MiniDiff.MiniDiff):
         #print "MD2v4.calibrationFactorsChanged", self.x_calib.getValue(), self.y_calib.getValue(), self.beamPosX.getValue(), self.beamPosY.getValue()
         self.emit("minidiffReady", ())
         self.emit("minidiffStateChanged", (self.zoomMotor.getState()))
+        self.emit("pixelsPerMmChanged", (self.getCalibrationData(),))
+
+    def stateChanged(self, value):
+        #print "MD2v4.stateChanged", value, type(value)
+        if value == PyTango.DevState.STANDBY:
+            while not self.isReady():
+                #print "waiting"
+                time.sleep(0.1)
+        self.emit("stateChanged", (value,))
 
     def getBeamPosX(self):
         return self.beamPosX.getValue()
@@ -84,17 +96,21 @@ class MD2v4(MiniDiff.MiniDiff):
     def getBeamPosY(self):
         return self.beamPosY.getValue()
 
-    def getCalibrationData(self, offset):
+    def getCalibrationData(self, offset = None):
         # update of self.pixelsPerMmY, self.pixelsPerMmZ carried out in MiniDiff base class triggered by zoom level update
         return (1000.0/self.x_calib.getValue(), 1000.0/self.y_calib.getValue())
 
     def emitCentringSuccessful(self):
+        # print "MD2v4.emitCentringSuccessful", self.state.getValue(), self.isReady()
+        while (self.state.getValue() != PyTango.DevState.STANDBY):
+            # print "waiting for STANDBY"
+            time.sleep(0.1)
         # save position in MD2 software
         self.getCommandObject("save_centring_position")()
         # do normal stuff
         return MiniDiff.MiniDiff.emitCentringSuccessful(self)
 
-    def startCentringMethod(self,method,sample_info=None):
+    def startCentringMethod(self,method,sample_info=None,wait=False):
 
         if self.phasePosition.getValue() != 1:
             # centring phase not activated yet
@@ -106,7 +122,7 @@ class MD2v4(MiniDiff.MiniDiff):
             self.startCentringPhaseCmd()
         
         # do the general centring stuff
-        MiniDiff.MiniDiff.startCentringMethod(self, method, sample_info)
+        MiniDiff.MiniDiff.startCentringMethod(self, method, sample_info, wait)
 
     def update_values(self):
         self.emit('zoomMotorPredefinedPositionChanged', None, None)
@@ -125,17 +141,5 @@ class MD2v4(MiniDiff.MiniDiff):
     def in_plate_mode(self):
 	return False
 
-    def take_snapshots(self, image_count, wait = False):
-        """
-        Descript. :
-        """
-
-        return
-
-    def takeSnapshots(self, image_count, wait = False):
-        """
-        Descript. :
-        """
-
-        return
-
+    def move_to_beam(self, x, y):
+        logging.getLogger("HWR").info("MD2v4: \"move to beam\" functionality not implemented yet.")

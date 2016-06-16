@@ -2,10 +2,14 @@ from BESSYMultiCollect import *
 from detectors.LimaPilatus import Pilatus
 import shutil
 import logging
+import gevent
+import socket
 
 class BESSY141MultiCollect(BESSYMultiCollect):
     def __init__(self, name):
         BESSYMultiCollect.__init__(self, name, PixelDetector(Pilatus), TunableEnergy())
+
+        self._notify_greenlet = None
 
 
     @task
@@ -107,7 +111,45 @@ class BESSY141MultiCollect(BESSYMultiCollect):
             logging.exception("Exception happened while copying geo_corr files")
        
         return BESSYMultiCollect.write_input_files(self, datacollection_id)
+
+    @task
+    def set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
+        self.last_image_filename = filename
+        return BESSYMultiCollect.set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path)
         
+    def adxv_notify(self, image_filename):
+        logging.info("adxv_notify %r", image_filename)
+        try:
+            adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            adxv_notify_socket.connect(("localhost", 8100))
+            adxv_notify_socket.sendall("load_image %s\n" % image_filename)
+            adxv_notify_socket.close()
+        except Exception, err:
+            logging.info("adxv_notify exception : %r", image_filename)
+            #print Exception, err
+            pass
+        else:
+            gevent.sleep(3)
+        
+    """
+    def albula_notify(self, image_filename):
+       try:
+          albula_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+          albula_socket.connect(('hkl5.psf.bessy.de', 31337))
+      except:
+          pass
+      else:
+          albula_socket.sendall(pickle.dumps({ "type":"newimage", "path": image_filename }))
+    """
+
+    @task
+    def write_image(self, last_frame):
+        BESSYMultiCollect.write_image(self, last_frame)
+        if last_frame:
+            gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+        else:
+            if self._notify_greenlet is None or self._notify_greenlet.ready():
+                self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
 
     def get_archive_directory(self, directory):
        

@@ -10,6 +10,10 @@ import time
 from HardwareRepository import HardwareRepository
 from HardwareRepository.BaseHardwareObjects import HardwareObject
 
+# to simulate wrong loginID, use "wrong" for loginID
+# to simulate wrong psd, use "wrong" for password
+# to simulate ispybDown, but ldap login succeeds, use "ispybDown" for password
+# to simulate no session scheduled, use "nosession" for password
 
 class ISPyBClient2Mockup(HardwareObject):
     """
@@ -21,14 +25,22 @@ class ISPyBClient2Mockup(HardwareObject):
         self.__translations = {}
         self.__disabled = False
         self.__test_proposal = None
+        self.loginType = None
 
     def init(self):
-        self.session_hwobj = self.getObjectByRole('session')
-        if self.session_hwobj:
-            self.beamline_name = self.session_hwobj.beamline_name
-        else:
-            self.beamline_name = 'ID:TEST'
+        """
+        Init method declared by HardwareObject.
+        """
+        self.authServerType = self.getProperty('authServerType') or "ldap"
+        if self.authServerType == "ldap":
+            # Initialize ldap
+            self.ldapConnection=self.getObjectByRole('ldapServer')
+            if self.ldapConnection is None:
+                logging.getLogger("HWR").debug('LDAP Server is not available')
 
+        self.loginType = self.getProperty("loginType") or "proposal"
+        self.session_hwobj = self.getObjectByRole('session')
+        self.beamline_name = self.session_hwobj.beamline_name
 
         self.__test_proposal = {'status': {'code': 'ok'},
                 'Person': {'personId': 1,
@@ -51,6 +63,31 @@ class ISPyBClient2Mockup(HardwareObject):
                              'proposalId': 1, 'nbShifts': 3}],
                 'Laboratory': {'laboratoryId': 1,
                                'name': 'TEST eh1'}}
+
+    def get_login_type(self):
+        self.loginType = self.getProperty("loginType") or "proposal"
+
+    def login (self,loginID, psd, ldap_connection=None):
+
+        # to simulate wrong loginID
+        if loginID == "wrong":
+	    return {'status':{ "code": "error", "msg": "loginID 'wrong' does not exist!" }, 'Proposal': None, 'Session': None} 
+        # to simulate wrong psd
+        if psd == "wrong":
+	    return {'status':{ "code": "error", "msg": "Wrong password!" }, 'Proposal': None, 'Session': None}
+        # to simulate ispybDown, but login succeed
+        if psd == "ispybDown":
+	    return {'status':{ "code": "ispybDown", "msg": "ispyb is down" }, 'Proposal': None, 'Session': None}
+ 
+        new_session = False
+        if psd == "nosession":
+	    new_session=True
+        prop=self.get_proposal(loginID,"")
+	return {'status':{ "code": "ok", "msg": "Successful login" }, 'Proposal': prop['Proposal'],
+                 'session': {"session": prop['Session'],"new_session_flag":new_session, "is_inhouse": False},
+                 'local_contact': "BL Scientist",
+                 'person': prop['Person'],
+                 'laboratory': prop['Laboratory']}
 
     def get_proposal(self, proposal_code, proposal_number):
         """
@@ -204,7 +241,188 @@ class ISPyBClient2Mockup(HardwareObject):
 
 
     def get_samples(self, proposal_id, session_id):
-        pass
+        return [{"cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "1", 
+      "crystalSpaceGroup": "P212121", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457980, 
+        "experimentKind": "Default", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "Default", 
+      "proteinAcronym": "A-TIM", 
+      "sampleId": 515485, 
+      "sampleLocation": "1", 
+      "sampleName": "fghfg", 
+      "smiles": None
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457833, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515419, 
+      "sampleLocation": "1", 
+      "sampleName": "sample"
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457834, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515420, 
+      "sampleLocation": "2", 
+      "sampleName": "sample"
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457835, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515421, 
+      "sampleLocation": "3", 
+      "sampleName": "sample"
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457836, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515422, 
+      "sampleLocation": "5", 
+      "sampleName": "sample"
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457837, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515423, 
+      "sampleLocation": "6", 
+      "sampleName": "sample"
+    }, 
+    {
+      "cellA": 0.0, 
+      "cellAlpha": 0.0, 
+      "cellB": 0.0, 
+      "cellBeta": 0.0, 
+      "cellC": 0.0, 
+      "cellGamma": 0.0, 
+      "containerSampleChangerLocation": "2", 
+      "crystalSpaceGroup": "P2", 
+      "diffractionPlan": {
+        "diffractionPlanId": 457838, 
+        "experimentKind": "OSC", 
+        "numberOfPositions": 0, 
+        "observedResolution": 0.0, 
+        "preferredBeamDiameter": 0.0, 
+        "radiationSensitivity": 0.0, 
+        "requiredCompleteness": 0.0, 
+        "requiredMultiplicity": 0.0, 
+        "requiredResolution": 0.0
+      }, 
+      "experimentType": "OSC", 
+      "proteinAcronym": "B2 hexa", 
+      "sampleId": 515424, 
+      "sampleLocation": "7", 
+      "sampleName": "sample"
+    }]
     
         
     def get_session_samples(self, proposal_id, session_id, sample_refs):
@@ -231,7 +449,6 @@ class ISPyBClient2Mockup(HardwareObject):
         :rtype: list
         """
         pass
-
     
     def get_bl_sample(self, bl_sample_id):
         """
@@ -324,15 +541,24 @@ class ISPyBClient2Mockup(HardwareObject):
         :rtype: int
         """
         pass
-    
 
     def _store_data_collection_group(self, group_data):
         pass
 
-
-    def store_centred_position(self, end_cpos):
+    def store_centred_position(self, end_cpos, gridx=None, gridy=None):
         pass
 
+    def store_autoproc_program(self, autoproc_program_dict):
+        pass
+
+    def store_workflow(self, *args, **kwargs):
+        return 1, 1, 1
+
+    def _store_workflow(self, info_dict):
+        pass
+
+    def store_image_quality_indicators(self, image_dict):
+        pass
 
     # Bindings to methods called from older bricks.
     getProposal = get_proposal

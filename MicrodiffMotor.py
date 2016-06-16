@@ -8,7 +8,29 @@ from HardwareRepository.BaseHardwareObjects import Device
 class MD2TimeoutError(Exception):
     pass
 
+"""
+Exaplle xml file:
+<device class="MicrodiffMotor">
+  <username>phiy</username>
+  <exporter_address>wid30bmd2s:9001</exporter_address>
+  <motor_name>AlignmentY</motor_name>
+  <GUIstep>1.0</GUIstep>
+  <unit>-1e-3</unit>
+</device>
+"""
+
 class MicrodiffMotor(AbstractMotor, Device):      
+    (NOTINITIALIZED, UNUSABLE, READY, MOVESTARTED, MOVING, ONLIMIT) = (0,1,2,3,4,5)
+    EXPORTER_TO_MOTOR_STATE = { "Invalid": NOTINITIALIZED,
+                                "Fault": UNUSABLE,
+                                "Ready": READY,
+                                "Moving": MOVING,
+                                "Created": NOTINITIALIZED,
+                                "Initializing": NOTINITIALIZED,
+                                "Unknown": UNUSABLE,
+                                "LowLim": ONLIMIT,
+                                "HighLim": ONLIMIT }
+
     def __init__(self, name):
         AbstractMotor.__init__(self) 
         Device.__init__(self, name)
@@ -34,27 +56,15 @@ class MicrodiffMotor(AbstractMotor, Device):
                                                self.motor_name + self.motor_pos_attr_suffix)
         if self.position_attr is not None:
           self.position_attr.connectSignal("update", self.motorPositionChanged)
-
-        
-        self.state_attr = self.addChannel({"type":"exporter", 
-                                           "name":"%sState" %self.motor_name}, 
-                                           "State")
-        self.motors_state_attr = self.addChannel({"type":"exporter", 
-                                                  "name":"MotorStates"}, 
-                                                  "MotorStates")
-        if self.motors_state_attr is not None: 
-            self.motors_state_attr.connectSignal("update", self.updateMotorState)
-    
-        self._motor_abort = self.addCommand( {"type":"exporter", 
-                                              "name":"abort" }, 
-                                              "abort")
-        self.get_limits_cmd = self.addCommand({"type": "exporter", 
-                                               "name": "getMotorLimits(%s)" %self.motor_name}, 
-                                               "getMotorLimits")
-
-        self.get_dynamic_limits_cmd = self.addCommand({"type": "exporter",
-                                                       "name": "getMotorDynamicLimits(%s)" %self.motor_name},
-                                                       "getMotorDynamicLimits")
+          self.state_attr = self.addChannel({"type":"exporter", "name":"state" }, "State")
+          #self.state_attr.connectSignal("update", self.globalStateChanged)
+          self.motors_state_attr = self.addChannel({"type":"exporter", "name":"motor_states"}, "MotorStates")
+          self.motors_state_attr.connectSignal("update", self.updateMotorState)
+          self._motor_abort = self.addCommand( {"type":"exporter", "name":"abort" }, "abort")
+          #TODO: dynamic limits
+          #self.motor_limits_attr = self.addChannel({"type":"exporter", "name":"limits"}, self.motor_name+"DynamicLimits" )
+          self.get_limits_cmd = self.addCommand( { "type": "exporter", "name": "get_limits"}, "getMotorLimits")
+          self.home_cmd = self.addCommand( {"type":"exporter", "name":"homing" }, "startHomingMotor")
 
     def connectNotify(self, signal):
         if signal == 'positionChanged':
@@ -170,3 +180,10 @@ class MicrodiffMotor(AbstractMotor, Device):
     def stop(self):
         if self.getState() != MicrodiffMotor.NOTINITIALIZED:
           self._motor_abort()
+
+    def homeMotor(self, timeout=None):
+        self.home_cmd(self.motor_name)
+        try:
+            self.waitEndOfMove(timeout)
+        except:
+            raise MD2TimeoutError

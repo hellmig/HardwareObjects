@@ -51,11 +51,21 @@ class MachCurrentEpics(BaseHardwareObjects.Device):
         #except ValueError:
         #    lifeTimeSeconds = 0
         #print self.fillMode
-        self.emit('valueChanged', (self.machValue, None, self.fillModeStr, None))
+        values_to_send = []
+        values_to_send.append(self.machValue)
+        values_to_send.append(self.fillModeStr)
+        values_to_send.append(None)
+        values_to_send.append(None)
+        self.emit('valuesChanged', values_to_send)
  
     def fillModeChanged(self, value):
         self.fillModeStr = value
-        self.emit('valueChanged', (self.machValue, None, self.fillModeStr, None))
+        values_to_send = []
+        values_to_send.append(self.machValue)
+        values_to_send.append(self.fillModeStr)
+        values_to_send.append(None)
+        values_to_send.append(None)
+        self.emit('valuesChanged', values_to_send)
 
     def getCurrent(self):
         #return self.getChannelObject('ring_current').getValue()
@@ -70,3 +80,6 @@ class MachCurrentEpics(BaseHardwareObjects.Device):
 
     def has_cryo(self):
 	return False
+
+    def update_values(self):
+	pass

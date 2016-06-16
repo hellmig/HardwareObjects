@@ -59,6 +59,7 @@ class AbstractMultiCollect(object):
         self.__safety_shutter_close_task = None
         self.run_without_loop = None
 
+
     def setControlObjects(self, **control_objects):
       self.bl_control = BeamlineControl(**control_objects)
   
@@ -168,7 +169,7 @@ class AbstractMultiCollect(object):
 
     @abc.abstractmethod
     def last_image_saved(self):
-        pass    
+      pass
 
     @abc.abstractmethod
     @task
@@ -299,7 +300,6 @@ class AbstractMultiCollect(object):
     def get_sample_info_from_parameters(self, parameters):
         """Returns sample_id, sample_location and sample_code from data collection parameters"""
         sample_info = parameters.get("sample_reference")
-        
         try:
             sample_id = int(sample_info["blSampleId"])
         except:
@@ -506,8 +506,11 @@ class AbstractMultiCollect(object):
         for motor in motors_to_move_before_collect.keys():
             if motors_to_move_before_collect[motor] is None:
                 del motors_to_move_before_collect[motor]
-                if current_diffractometer_position[motor] is not None:
-                    positions_str += "%s=%f " % (motor, current_diffractometer_position[motor])
+                try:
+                    if current_diffractometer_position[motor] is not None:
+                        positions_str += "%s=%f " % (motor, current_diffractometer_position[motor])
+                except:
+                    pass
 
         # this is for the LIMS
         positions_str += " ".join([motor+("=%f" % pos) for motor, pos in motors_to_move_before_collect.iteritems()])
@@ -544,11 +547,12 @@ class AbstractMultiCollect(object):
               snapshot_i = 1
               snapshots = []
               for img in centring_info["images"]:
-                img_phi_pos = img[0]
+                img_phi_pos = int(round(img[0], 0))
                 img_data = img[1]
-                snapshot_filename = "%s_%s_%s.snapshot.jpeg" % (file_parameters["prefix"],
+                snapshot_filename = "%s_%s_%s_%sdeg.snapshot.jpeg" % (file_parameters["prefix"],
                                                                 file_parameters["run_number"],
-                                                                snapshot_i)
+                                                                snapshot_i,
+                                                                img_phi_pos)
                 full_snapshot = os.path.join(snapshot_directory,
                                              snapshot_filename)
 

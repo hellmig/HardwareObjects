@@ -4,11 +4,12 @@ Descript: EMBLMultiCollect hwobj
 import os
 import logging
 import gevent
+import p13_calc_flux
 from HardwareRepository.TaskUtils import *
 from HardwareRepository.BaseHardwareObjects import HardwareObject
-from AbstractMultiCollect import AbstractMultiCollect
+from AbstractCollect import AbstractCollect
 
-class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
+class EMBLMultiCollect(AbstractCollect, HardwareObject):
     """
     Descript: Main data collection class. Inherited from AbstractMulticollect
               Collection is done by setting collection parameters and 
@@ -18,7 +19,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         """
         Descript. :
         """
-        AbstractMultiCollect.__init__(self)
+        AbstractCollect.__init__(self)
         HardwareObject.__init__(self, name)
         self._centring_status = None
         self._previous_collect_status = None
@@ -76,21 +77,14 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         self.run_without_loop = True
 
         self.ready_event = gevent.event.Event()
-        self.setControlObjects(diffractometer = self.getObjectByRole("diffractometer"),
-                               sample_changer = self.getObjectByRole("sample_changer"),
-                               lims = self.getObjectByRole("dbserver"),
-                               safety_shutter = self.getObjectByRole("safety_shutter"),
-                               machine_current = self.getObjectByRole("machine_current"),
-                               cryo_stream = self.getObjectByRole("cryo_stream"),
-                               energy = self.getObjectByRole("energy"),
-                               resolution = self.getObjectByRole("resolution"),
-                               detector_distance = self.getObjectByRole("detector_distance"),
-                               transmission = self.getObjectByRole("transmission"),
-                               undulators = self.getObjectByRole("undulators"),
-                               flux = self.getObjectByRole("flux"),
-                               detector = self.getObjectByRole("detector"),
-                               beam_info = self.getObjectByRole("beam_info"))
-
+        self.diffractometer_hwobj = self.getObjectByRole("diffractometer")
+        self.lims_hwobj = self.getObjectByRole("dbserver")
+        self.machine_current_hwobj = self.getObjectByRole("machine_current")
+        self.energy_hwobj = self.getObjectByRole("energy")
+        self.resolution_hwobj = self.getObjectByRole("resolution")
+        self.transmission_hwobj = self.getObjectByRole("transmission")
+        self.detector_hwobj = self.getObjectByRole("detector")
+        self.beam_info_hwobj = self.getObjectByRole("beam_info")
         self.autoprocessing_hwobj = self.getObjectByRole("auto_processing")
 
         undulators = []
@@ -101,7 +95,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
            pass  
         self.exp_type_dict = {'Mesh': 'raster',
                               'Helical': 'Helical'}
-        self.setBeamlineConfiguration(synchrotron_name = self.bl_control.lims.session_hwobj.synchrotron_name,
+        self.setBeamlineConfiguration(synchrotron_name = "EMBL-HH",
                                       directory_prefix = self.getProperty("directory_prefix"),
                                       default_exposure_time = self.bl_control.detector.getProperty("default_exposure_time"),
                                       minimum_exposure_time = self.bl_control.detector.getProperty("minimum_exposure_time"),
@@ -166,6 +160,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         Descript. : main collection command
         """
         if self._actual_collect_status in ["ready", "unknown", "error"]:
+            self.emit("progressInit", ("Data collection", 100))
             comment = 'Comment: %s' % str(p.get('comments', ""))
             self._error_msg = ""
             self._collecting = True
@@ -209,7 +204,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
             if self._actual_collect_status == "error":
                 self.emit_collection_failed()
             elif self._actual_collect_status == "collecting":
-                self.process_image(1)
+                self.store_image_in_lims_by_frame_num(1)
             if self._previous_collect_status is None:
                 if self._actual_collect_status == 'busy':
                     logging.info("Preparing collecting...")  
@@ -259,6 +254,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
               self.collection_id, self.osc_id, self.actual_data_collect_parameters))
         self.emit("collectEnded", self.owner, success_msg)
         self.emit("collectReady", (True, ))
+        self.emit("progressStop", ()) 
         self._collecting = None
         self.ready_event.set()
 
@@ -266,7 +262,7 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
 
         last_frame = self.actual_data_collect_parameters['oscillation_sequence'][0]['number_of_images']
         if last_frame > 1:
-            self.process_image(last_frame)
+            self.store_image_in_lims_by_frame_num(last_frame)
         if (self.actual_data_collect_parameters['experiment_type'] in ('OSC', 'Helical') and
             self.actual_data_collect_parameters['oscillation_sequence'][0]['overlap'] == 0 and
             self.actual_data_collect_parameters['oscillation_sequence'][0]['number_of_images'] > 19):
@@ -299,10 +295,14 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         """
         Descript. : 
         """
-        self.collect_frame = frame
-        self.emit("collectImageTaken", frame) 
+        if self._collecting: 
+            self.collect_frame = frame
+            number_of_images = self.actual_data_collect_parameters\
+                 ['oscillation_sequence'][0]['number_of_images']
+            self.emit("progressStep", (int(float(frame) / number_of_images * 100)))
+            self.emit("collectImageTaken", frame) 
 
-    def process_image(self, frame, motor_position_id=None):
+    def store_image_in_lims_by_frame_num(self, frame, motor_position_id=None):
         """
         Descript. :
         """
@@ -313,7 +313,6 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
             return
         image_id = None
 
-        print "process_image... ", frame
         if self.bl_control.lims:
             try:
                 file_location = self.actual_data_collect_parameters["fileinfo"]["directory"]
@@ -446,135 +445,39 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         if self.bl_control.detector is not None:
             self.bl_control.detector.set_collect_mode(collect_mode) 
         
-    @task
-    def move_detector(self, detector_distance):
-        """
-        Descript. : 
-        """    
-        return
-
-    @task
-    def close_fast_shutter(self):
-        """
-        Descript. : 
-        """
-        return
-
-    @task
-    def open_fast_shutter(self):
-        """
-        Descript. : 
-        """
-        return
-        
     @task 
     def move_motors(self, motor_position_dict):
         """
         Descript. : 
         """        
-        self.bl_control.diffractometer.move_motors(motor_position_dict)
+        self.diffractometer_hwobj.move_motors(motor_position_dict)
 
-    def frameEmitter(self, frame):
-        """
-        Descript. : 
-        """
-        return
-
-    @task
-    def open_safety_shutter(self):
-        """
-        Descript. : 
-        """
-        return
-
-    @task
-    def close_safety_shutter(self):
-        """
-        Descript. : 
-        """
-        return
-
-    @task
-    def prepare_intensity_monitors(self):
-        """
-        Descript. : 
-        """
-        return
-
-    def prepare_acquisition(self, take_dark, start, osc_range, exptime, npass, number_of_images, comment=""):
-        """
-        Descript. : 
-        """
-        return 
-
-    def set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
-        """
-        Descript. : 
-        """
-        return 
-
-    def prepare_oscillation(self, start, osc_range, exptime, npass):
-        """
-        Descript. : 
-        """
-        return start, start+osc_range
-
-    
-    def do_oscillation(self, start, end, exptime, npass):
-        """
-        Descript. : 
-        """    
-        return
-    
-    def start_acquisition(self, exptime, npass, first_frame):
-        """
-        Descript. : 
-        """
-        return
-   
-    def write_image(self, last_frame):
-        """
-        Descript. : 
-        """
-        return 
-
-    def stop_acquisition(self):
-        """
-        Descript. : 
-        """
-        return
-              
-    def reset_detector(self):
-        """
-        Descript. : 
-        """
-        return       
-
-    def prepare_input_files(self, files_directory, prefix, run_number, process_directory):
+    def prepare_input_files(self):
         """
         Descript. : 
         """
         i = 1
         while True:
-            xds_input_file_dirname = "xds_%s_%s_%d" % (prefix, run_number, i)
-            xds_directory = os.path.join(process_directory, xds_input_file_dirname)
+            xds_input_file_dirname = "xds_%s_%s_%d" % (\
+                self.current_dc_parameters['fileinfo']['prefix'], 
+                self.current_dc_parameters['fileinfo']['run_number'],
+                i)
+            xds_directory = os.path.join(\
+                self.current_dc_parameters['fileinfo']['process_directory'], 
+                xds_input_file_dirname)
             if not os.path.exists(xds_directory):
                 break
             i += 1
-        mosflm_input_file_dirname = "mosflm_%s_run%s_%d" % (prefix, run_number, i)
-        mosflm_directory = os.path.join(process_directory, mosflm_input_file_dirname)
 
-        #self.raw_data_input_file_dir = os.path.join(files_directory, "process", xds_input_file_dirname)
-        #self.mosflm_raw_data_input_file_dir = os.path.join(files_directory, "process", mosflm_input_file_dirname)
-        
+        mosflm_input_file_dirname = "mosflm_%s_run%s_%d" % (\
+                self.current_dc_parameters['fileinfo']['prefix'], 
+                self.current_dc_parameters['fileinfo']['run_number'],
+                i)
+        mosflm_directory = os.path.join(\
+                self.current_dc_parameters['fileinfo']['process_directory'], 
+                mosflm_input_file_dirname)
+
         return xds_directory, mosflm_directory, ""
-
-    @task
-    def write_input_files(self, collection_id):
-        """
-        Descript. : 
-        """
-        return
 
     def get_wavelength(self):
         """
@@ -659,8 +562,37 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         """
         Descript. : 
         """
-        #return 0
-        return 3.000000e+12
+        flux = None
+        if self.bl_control.lims:
+            if self.bl_control.lims.beamline_name == "P13":
+                aperture_pos = self.bl_control.beam_info.get_aperture_pos_name()
+                energy = self.bl_control.energy.getCurrentEnergy()
+                #mode = self.bl_control.beam_info.get_focus_mode()
+                mode = "large"
+
+                flux = p13_calc_flux.calculate_flux(aperture_pos, energy, mode) / 4.0
+                #flux =  2.64E+11 
+            else:
+                fullflux = 3.5e12
+                fullsize_hor = 1.200
+                fullsize_ver =  0.700
+
+                foc = self.bl_control.beam_info.get_focus_mode()
+
+                if foc == 'unfocused':
+                    flux = fullflux * self.get_beam_size()[0] * \
+                           self.get_beam_size()[1] / fullsize_hor / fullsize_ver
+                elif foc == 'horizontal':
+                    flux = fullflux * self.get_beam_size()[1] / fullsize_ver
+                elif foc == 'vertical':
+                    flux = fullflux * self.get_beam_size()[0] / fullsize_hor
+                elif foc == 'double':
+                    flux = fullflux
+                else:
+                    flux = None
+                logging.getLogger("HWR").info("Flux in %s mode %e photon/sec"%(self.bl_control.beam_info.get_focus_mode(),flux))
+        return flux
+
 
     def get_machine_current(self):
         """
@@ -709,42 +641,6 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         """
         return self.bl_config._asdict()
 
-    def isConnected(self):
-        """
-        Descript. : 
-        """
-        return True
-      
-    def isReady(self):
-        """
-        Descript. : 
-        """
-        return True
- 
-    def diffractometer(self):
-        """
-        Descript. : 
-        """
-        return self.bl_control.diffractometer
-
-    def sanityCheck(self, collect_params):
-        """
-        Descript. : 
-        """
-        return
-    
-    def setBrick(self, brick):
-        """
-        Descript. : 
-        """
-        return
-
-    def directoryPrefix(self):
-        """
-        Descript. : 
-        """
-        return self.bl_config.directory_prefix
-
     def store_image_in_lims(self, frame, first_frame, last_frame):
         """
         Descript. : 
@@ -756,37 +652,4 @@ class EMBLMultiCollect(AbstractMultiCollect, HardwareObject):
         """
         Descript. : 
         """
-        return
-
-    def getOscillation(self, oscillation_id):
-        """
-        Descript. : 
-        """
-        return self.oscillations_history[oscillation_id - 1]
-       
-    def sampleAcceptCentring(self, accepted, centring_status):
-        """
-        Descript. : 
-        """
-        self.sample_centring_done(accepted, centring_status)
-
-    def setCentringStatus(self, centring_status):
-        """
-        Descript. : 
-        """
-        self._centring_status = centring_status
-
-    def getOscillations(self, session_id):
-        """
-        Descript. : 
-        """
-        return []
-
-    def get_archive_directory(self, directory):
-        return
-
-    def data_collection_cleanup(self):
-        """
-        Descript. : 
-        """
-        return
+        return self.get_measured_intensity()

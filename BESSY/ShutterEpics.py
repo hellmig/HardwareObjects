@@ -33,6 +33,12 @@ class ShutterEpics(Device):
         # call ringCurrentChanged manually once in order to initialize view
         self.safshutChanged()
 
+    def connectNotify(self, signal):
+        if signal == 'shutterStateChanged':
+                pass
+                #print "connectNotify shutterStateChanged"
+                #self.safshutChanged()
+                # self.emit('shutterStateChanged', (self.safshutChanged(), ))
 
     def getShutterState(self):
         return ShutterEpics.shutterState[self.shutterStateValue] 
@@ -54,12 +60,12 @@ class ShutterEpics(Device):
         #
         # emit signal
         #
-        if value == None:
+        if value is None:
             value = 0
             if self.safshut is not None:
                 value = self.safshut.getValue()
 
         if value is not None:
             self.shutterStateValue = value
-            self.emit('shutterStateChanged', (ShutterEpics.shutterState[self.shutterStateValue], ))
+            self.emit('shutterStateChanged', (ShutterEpics.shutterState[self.shutterStateValue], ShutterEpics.shutterState[self.shutterStateValue], ))
 

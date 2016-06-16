@@ -3,18 +3,22 @@ CATS maintenance commands hardware object.
 
 Functionality in addition to sample-transfer functionality: power control,
 lid control, error-recovery commands, ...
+Derived from Michael Hellmig's implementation for the BESSY CATS sample changer
+ -add more controls, including Regulation Off, Gripper Dry/Open/Close, Reset Memory, Set Sample On Diff
+ -add CATS dewar layout
 """
 import logging
 from HardwareRepository.TaskUtils import *
 from HardwareRepository.BaseHardwareObjects import Equipment
 import gevent
 import time
+import Cats90
 
-__author__ = "Michael Hellmig"
+__author__ = "Jie Nan"
 __credits__ = ["The MxCuBE collaboration"]
 
-__email__ = "michael.hellmig@helmholtz-berlin.de"
-__status__ = "Beta"
+__email__ = "jie.nan@maxlab.lu.se"
+__status__ = "Alpha"
 
 class CatsMaint(Equipment):
     __TYPE__ = "CATS"    
@@ -32,12 +36,14 @@ class CatsMaint(Equipment):
         self._chnPathRunning.connectSignal("update", self._updateRunningState)
         self._chnPowered = self.getChannelObject("_chnPowered")
         self._chnPowered.connectSignal("update", self._updatePoweredState)
+        self._chnToolOpenClose = self.getChannelObject("_chnToolOpenClose")
+        self._chnToolOpenClose.connectSignal("update", self._updateToolState)
         self._chnMessage = self.getChannelObject("_chnMessage")
         self._chnMessage.connectSignal("update", self._updateMessage)
         self._chnLN2Regulation = self.getChannelObject("_chnLN2RegulationDewar1")
         self._chnLN2Regulation.connectSignal("update", self._updateRegulationState)
            
-        for command_name in ("_cmdReset", "_cmdBack", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
+        for command_name in ("_cmdReset","_cmdDry","_cmdOpenTool","_cmdCloseTool", "_cmdCalibration","_cmdSetOnDiff", "_cmdClearMemory","_cmdResetParameters","_cmdBack", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
                              "_cmdOpenLid1", "_cmdCloseLid1", "_cmdOpenLid2", "_cmdCloseLid2", "_cmdOpenLid3", "_cmdCloseLid3", \
                              "_cmdRegulOn"):
             setattr(self, command_name, self.getCommandObject(command_name))
@@ -79,6 +85,74 @@ class CatsMaint(Equipment):
         :rtype: None
         """
         self._cmdReset()
+    def _doResetMemory(self):
+        """
+        Launch the "reset memory" command on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdClearMemory()
+        time.sleep(1)
+        self._cmdResetParameters()
+        time.sleep(1)
+
+    def _doCalibration(self):
+        """
+        Launch the "toolcalibration" command on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdCalibration(2)
+
+    def _doOpenTool(self):
+        """
+        Launch the "opentool" command on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdOpenTool()
+ 
+    def _doCloseTool(self):
+        """
+        Launch the "closetool" command on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdCloseTool()
+
+    def _doDryGripper(self):
+        """
+        Launch the "dry" command on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdDry(2)
+      
+
+    def _doSetOnDiff(self, sample):
+        """
+        Launch the "setondiff" command on the CATS Tango DS, an example of sample value is 2:05
+
+        :returns: None
+        :rtype: None
+        """
+
+        if sample is None:
+            raise Exception ("No sample selected")
+        else:
+            str_tmp=str(sample)
+            sample_tmp=str_tmp.split(":")
+            # calculate CATS specific lid/sample number
+            lid = (int(sample_tmp[0]) - 1) / 3 + 1
+            puc_pos = ((int(sample_tmp[0]) - 1) % 3) * 10 + int(sample_tmp[1])
+            argin = [ str(lid), str(puc_pos), "0"]
+            logging.getLogger().info("to SetOnDiff %s", argin)
+            self._executeServerTask(self._cmdSetOnDiff,argin)
 
     def _doBack(self):
         """
@@ -87,7 +161,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        argin = 2
+        argin = ["2", "0"] # to send string array with two arg...
         self._executeServerTask(self._cmdBack, argin)
 
     def _doSafe(self):
@@ -120,6 +194,15 @@ class CatsMaint(Equipment):
         :rtype: None
         """
         self._cmdRegulOn()
+
+    def _doDisableRegulation(self):
+        """
+        Switch off CATS regulation
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdRegulOff()
 
     def _doLid1State(self, state = True):
         """
@@ -185,6 +268,9 @@ class CatsMaint(Equipment):
 
     def _updatePoweredState(self, value):
         self.emit('powerStateChanged', (value, ))
+    
+    def _updateToolState(self,value):
+        self.emit('toolStateChanged', (value, ))
 
     def _updateMessage(self, value):
         self.emit('messageChanged', (value, ))
