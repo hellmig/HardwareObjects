@@ -14,6 +14,8 @@ import numpy
 import queue_model_objects_v1 as qmo
 
 class Nanodiff(Equipment):
+    CENTRING_METHOD_MANUAL = "Manual 3-click"
+    CENTRING_METHOD_AUTO = "Computer automatic"
     MANUAL3CLICK_MODE = "Manual 3-click"
     C3D_MODE = "Computer automatic"
     #MOVE_TO_BEAM_MODE = "Move to Beam"
@@ -190,6 +192,7 @@ class Nanodiff(Equipment):
         self.get_centring_status = self.getCentringStatus 
         self.take_snapshots = self.takeSnapshots 
         self.move_motors = self.moveMotors 
+        self.is_ready = self.isReady
         # ---------------------
         self.emit('miniDiffReady', ())
 
