@@ -56,6 +56,10 @@ class MD2v4_Motor(Device):
         self.motorStateChanged(self.motorState)
 
     def motorStateChanged(self, state):
+        if (state == 2):
+            new_pos = self.position_attr.getValue()
+            self.motorPositionChanged(new_pos)
+           
         logging.getLogger().debug("%s: in motorStateChanged: motor state changed to %s", self.name(), state)
         self.updateState()
         self.emit('stateChanged', (self.motorState, ))
