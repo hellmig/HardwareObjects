@@ -139,11 +139,6 @@ class GraphicsItem(QtGui.QGraphicsItem):
         else:
             self.hide()
 
-    def set_pixels_per_mm(self, pixels_per_mm):
-        if all(pixels_per_mm):
-            self.pixels_per_mm = pixels_per_mm
-            self.update_item()
-
     def get_display_name(self):
         return "Item %d" % self.index
 
@@ -172,9 +167,11 @@ class GraphicsItem(QtGui.QGraphicsItem):
         self.beam_size_pix[1] = self.beam_size_microns[1] * self.pixels_per_mm[1]
 
     def set_pixels_per_mm(self, pixels_per_mm):
-        self.pixels_per_mm = pixels_per_mm
-        self.beam_size_pix[0] = self.beam_size_microns[0] * self.pixels_per_mm[0]
-        self.beam_size_pix[1] = self.beam_size_microns[1] * self.pixels_per_mm[1]
+        if all(pixels_per_mm):
+            self.pixels_per_mm = pixels_per_mm
+            self.beam_size_pix[0] = self.beam_size_microns[0] * self.pixels_per_mm[0]
+            self.beam_size_pix[1] = self.beam_size_microns[1] * self.pixels_per_mm[1]
+            self.update_item()
 
 class GraphicsItemBeam(GraphicsItem):
     """
