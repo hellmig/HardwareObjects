@@ -62,6 +62,10 @@ class Session(HardwareObject):
                                                           self['file_info'].getProperty('archive_folder'))
         queue_model_objects.PathTemplate.set_path_template_style(self.getProperty('synchrotron_name'))
 
+	check_session_date = self.get_session_start_date()
+	if not check_session_date:
+	   start_date = time.strftime("%Y%m%d")
+	   self.set_session_start_date(start_date)
 
     def get_base_data_directory(self):
         """
