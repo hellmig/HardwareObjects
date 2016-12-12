@@ -87,6 +87,7 @@ class BESSY142XRFSpectrum(BESSYAbstractXRFSpectrum, HardwareObject):
 
         self.cmd_spectrum_start = self.getCommandObject('cmdSpectrumStart')
         # self.cmd_adjust_transmission = self.getCommandObject('cmdAdjustTransmission')
+        self.cmd_prepare_xrf_acq = self.getCommandObject('cmdPrepareAcq')
         self.chan_spectrum_status = self.getChannelObject('chanSpectrumStatus')
         if self.chan_spectrum_status is not None:
             self.chan_spectrum_status.connectSignal('update', self.spectrum_status_update)
@@ -97,6 +98,13 @@ class BESSY142XRFSpectrum(BESSYAbstractXRFSpectrum, HardwareObject):
         self.config_filename = self.getProperty("configFile")
 
     def execute_spectrum_command(self, count_sec, filename, adjust_transmission=True):
+        print self.cmd_prepare_xrf_acq, self.cmd_spectrum_start
+        try:
+            self.cmd_prepare_xrf_acq()
+        except:
+            logging.getLogger().exception('BESSY142XRFSpectrum: problem starting data-collection phase.')
+            self.emit('xrfSpectrumStatusChanged', ("Error problem in starting spectrum",))
+            self.spectrum_command_aborted()
         try:
             self.cmd_spectrum_start(count_sec)
         except:
