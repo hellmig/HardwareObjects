@@ -20,6 +20,11 @@ class BESSY142Attenuators(Device):
         self.chanAttState.connectSignal('update', self.attStateChanged)
         self.chanAttFactor = self.getChannelObject('attfactor')
         self.chanAttFactor.connectSignal('update', self.attFactorChanged)
+        self.cmdTransmRecalc = self.getCommandObject('transm_recalc')
+
+        self.filtMot = self.getObjectByRole("transm_filter")
+        if self.filtMot:
+            self.connect(self.filtMot, "moveDone", self.filterMotorMoveDone)
         
         if cmdToggle.isConnected():
             self.connected()
@@ -92,3 +97,9 @@ class BESSY142Attenuators(Device):
     def update_values(self):
         self.attStateChanged(self.getAttState())
         self.attFactorChanged(self.getAttFactor())
+
+    def filterMotorMoveDone(self, var1, var2):
+        # print "BESSY142Attenuators.filterMotorMoveDone"
+        if self.cmdTransmRecalc:
+            self.cmdTransmRecalc()
+        self.update_values()
