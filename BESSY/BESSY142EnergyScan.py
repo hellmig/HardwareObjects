@@ -2,6 +2,9 @@ from BESSYEnergyScan import *
 import logging
 
 class BESSY142EnergyScan(BESSYEnergyScan):
+
+    RAW_DATA_FILE_PATH = "/142dat/pxrdat/scans/today/d_scan_000.raw"
+
     def __init__(self, name):
         # print "BESSY142EnergyScan.__init__"
         BESSYEnergyScan.__init__(self, name, TunableEnergy())
@@ -43,3 +46,7 @@ class BESSY142EnergyScan(BESSYEnergyScan):
 
     def canMoveEnergy(self):
         return self.canScanEnergy()
+
+    @task
+    def escan_prepare(self):
+        self.execute_command("prepareScan")

@@ -31,6 +31,11 @@ class TunableEnergy:
 
     
 class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
+   
+    # RAW_DATA_FILE_PATH must be overwritten by the beamline-specific
+    # implementions in BESSY141EnergyScan/BESSY142EnergyScan
+    RAW_DATA_FILE_PATH = "/path/to/data/file"
+
     def __init__(self, name, tunable_bl):
         # print "BESSYEnergyScan.__init__"
         AbstractEnergyScan.__init__(self)
@@ -226,6 +231,8 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         return
 
     def doChooch(self, elt, edge, scan_directory, archive_directory, prefix):
+        # from qt4_debug import *
+        # bkpoint()
         symbol = "-".join((elt, edge))
         dateTime = time.strftime("%Y%m%d-%H%M%S")
 
@@ -240,9 +247,9 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         scan_file_efs_filename = os.path.extsep.join((scan_file_prefix, "efs"))
         scan_file_png_filename = os.path.extsep.join((scan_file_prefix, "png"))
 
-        raw_data_file = '/141dat/pxrdat/scans/today/d_scan_000.raw'
+        # raw_data_file = '/142dat/pxrdat/scans/today/d_scan_000.raw'
         try:
-             self.scanData = self._readScanData(raw_data_file)
+             self.scanData = self._readScanData(self.RAW_DATA_FILE_PATH)
         except:
             self.storeEnergyScan()
             self.emit("energyScanFailed", ())
@@ -252,12 +259,12 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
         self.energy_scan_parameters["scanFileFullPath"]=str(scan_file_raw_filename)
 
         pk, fppPeak, fpPeak, ip, fppInfl, fpInfl, chooch_graph_data = PyChooch.calc(self.scanData, elt, edge, scan_file_efs_filename)
+	rm=(pk+30)/1000.0
+	pk=pk/1000.0
+	savpk = pk
+	ip=ip/1000.0
+	comm = ""
 
-        rm=(pk+30)/1000.0
-        pk=pk/1000.0
-        savpk = pk
-        ip=ip/1000.0
-        comm = ""
         self.energy_scan_parameters["peakEnergy"]=pk
         self.energy_scan_parameters["inflectionEnergy"]=ip
         self.energy_scan_parameters["remoteEnergy"]=rm
