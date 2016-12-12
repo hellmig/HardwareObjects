@@ -10,6 +10,8 @@ class BESSY142MultiCollect(BESSYMultiCollect):
         BESSYMultiCollect.__init__(self, name, PixelDetector(Pilatus), TunableEnergy())
 
         self._notify_greenlet = None
+        self.connect("collectImageTaken", self.collectImageTakenHandler)
+        self.connect("collectOscillationFinished", self.collectOscillationFinished_handler)
 
 
     @task
@@ -35,10 +37,7 @@ class BESSY142MultiCollect(BESSYMultiCollect):
       self.getChannelObject("parameters").setValue(data_collect_parameters)
       self.execute_command("build_collect_seq")
       #self.execute_command("local_set_experiment_type")
-      ret = self.execute_command("prepare_beamline")
-      print "**************************"
-      print ret
-      print "**************************"
+      self.execute_command("prepare_beamline")
 
     @task
     def move_detector(self, detector_distance):
@@ -117,6 +116,7 @@ class BESSY142MultiCollect(BESSYMultiCollect):
 
     @task
     def set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
+        # print "set_detector_filenames", frame_number, start, filename
         self.last_image_filename = filename
         return BESSYMultiCollect.set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path)
         
@@ -124,21 +124,21 @@ class BESSY142MultiCollect(BESSYMultiCollect):
         logging.info("adxv_notify %r", image_filename)
         try:
             adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            adxv_notify_socket.connect(("localhost", 8100))
+            adxv_notify_socket.connect(("hkl7.psf.bessy.de", 8100))
             adxv_notify_socket.sendall("load_image %s\n" % image_filename)
             adxv_notify_socket.close()
         except Exception, err:
-            logging.info("adxv_notify exception : %r", image_filename)
+            #logging.info("adxv_notify exception : %r", image_filename)
             #print Exception, err
             pass
-        else:
-            gevent.sleep(3)
+#        else:
+#            gevent.sleep(3)
         
     """
     def albula_notify(self, image_filename):
        try:
           albula_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-          albula_socket.connect(('hkl5.psf.bessy.de', 31337))
+          albula_socket.connect(('hkl7.psf.bessy.de', 31337))
       except:
           pass
       else:
@@ -148,11 +148,11 @@ class BESSY142MultiCollect(BESSYMultiCollect):
     @task
     def write_image(self, last_frame):
         BESSYMultiCollect.write_image(self, last_frame)
-        if last_frame:
-            gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
-        else:
-            if self._notify_greenlet is None or self._notify_greenlet.ready():
-                self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+#        if last_frame:
+#            gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+#        else:
+#            if self._notify_greenlet is None or self._notify_greenlet.ready():
+#                self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
 
     def get_archive_directory(self, directory):
        
@@ -177,3 +177,12 @@ class BESSY142MultiCollect(BESSYMultiCollect):
 
     def get_cryo_temperature(self):
         return 100
+
+    def collectImageTakenHandler(self, frame):
+        if self._notify_greenlet is None or self._notify_greenlet.ready():
+            self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+
+    def collectOscillationFinished_handler(self, owner, state, dc_status, collection_id, osc_id, data_collect_parameters):
+        if self._notify_greenlet is None or self._notify_greenlet.ready():
+            self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+       
