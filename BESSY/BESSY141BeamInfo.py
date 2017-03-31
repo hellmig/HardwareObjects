@@ -1,4 +1,3 @@
-
 from HardwareRepository.BaseHardwareObjects import Equipment
 from BeamInfo import BeamInfo
 import logging
@@ -12,19 +11,18 @@ class BESSY141BeamInfo(BeamInfo):
         BeamInfo.__init__(self,*args)
 
     def init(self):
-        self.vertpos_channel = self.getChannelObject("beam_vertical_position")
-        self.horizpos_channel = self.getChannelObject("beam_horizontal_position")
+        BeamInfo.init(self)
 
         self.vertpos = None
         self.horizpos = None
 
-        if self.vertpos_channel is not None and self.horizpos_channel is not None:
-            if self.vertpos_channel is not None:
-                self.vertpos_channel.connectSignal("update", self.verticalPositionChanged)
-            if self.horizpos_channel is not None:
-                self.horizpos_channel.connectSignal("update", self.horizontalPositionChanged)
+        self.vertpos_channel = self.getChannelObject("beam_vertical_position")
+        self.horizpos_channel = self.getChannelObject("beam_horizontal_position")
 
-        BeamInfo.init(self)
+        if self.vertpos_channel is not None:
+           self.vertpos_channel.connectSignal("update", self.verticalPositionChanged)
+        if self.horizpos_channel is not None:
+           self.horizpos_channel.connectSignal("update", self.horizontalPositionChanged)
 
         self.evaluate_beam_info()
         self.emit_beam_info_change()
@@ -54,6 +52,7 @@ class BESSY141BeamInfo(BeamInfo):
         if self.vertpos is not None:
             self.emit("beamPosChanged", ([self.horizpos, self.vertpos]))
             self.emit("beamPositionChanged", ([self.horizpos, self.vertpos]))
+            self.emit_beam_info_change()
 
     def verticalPositionChanged(self,value):
         logging.getLogger().info("Vertical beam position changed. It is %s" % str(value))
@@ -61,4 +60,16 @@ class BESSY141BeamInfo(BeamInfo):
         if self.horizpos is not None:
             self.emit("beamPosChanged", ([self.horizpos, self.vertpos]))
             self.emit("beamPositionChanged", ([self.horizpos, self.vertpos]))
+            self.emit_beam_info_change()
+
+    def aperture_pos_changed(self, pos, size):
+        """
+        Descript. :
+        Arguments :
+        Return    :
+        """
+        # print "BESSY141BeamInfo.aperture_pos_changed", pos, size
+        self.beam_size_aperture = size
+        self.evaluate_beam_info() 
+        self.emit_beam_info_change()
 
