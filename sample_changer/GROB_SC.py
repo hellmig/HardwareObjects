@@ -459,7 +459,8 @@ class GROB_SC(SampleChanger):
             # calculates GROB specific puck/sample number
             puck = selected.getBasketNo()
             sample = selected.getVialNo()
-            argin = [str(doubleTool), str(puck), str(sample)]
+            print puck, sample
+            argin = [str(doubleTool), str(puck-1), str(sample-1)]
             self._executeServerTask(self._cmdScanSample, argin)
             self._updateSampleBarcode(selected)
         elif isinstance(component, Container) and ( component.getType() == Basket.__TYPE__):
@@ -469,7 +470,8 @@ class GROB_SC(SampleChanger):
                 self._doSelect(component)            
             selected=self.getSelectedComponent()            
             puck = selected.getIndex()+1
-            argin = [str(doubleTool), str(puck)]
+            print puck
+            argin = [str(doubleTool), str(puck-1)]
             self._executeServerTask(self._cmdScanPuck, argin)
             self._updatePuckSamplesBarcodes(selected)
         elif isinstance(component, Container) and ( component.getType() == SC3.__TYPE__):
@@ -489,12 +491,16 @@ class GROB_SC(SampleChanger):
         # update information of recently scanned sample
         puckId = sample.getBasketNo()
         sampleId = sample.getVialNo()
-        argin = [str(puckId), str(sampleId)]
+        argin = [str(puckId-1), str(sampleId-1)]
         datamatrix = str(self._cmdReadSampleBarcode(argin))
         scanned = (len(datamatrix) != 0)
         if not scanned:    
-           datamatrix = '----------'   
+           # datamatrix = '----------'   
+           datamatrix = None
+        # state = sample.isPresent()
+        # print 'before', puckId, sampleId, state
         sample._setInfo(sample.isPresent(), datamatrix, scanned)
+        # print 'after', puckId, sampleId, sample.isPresent()
 
     def _updatePuckSamplesBarcodes(self, basket):
         """
@@ -505,14 +511,15 @@ class GROB_SC(SampleChanger):
         :rtype: None
         """
         # update information of recently scanned sample
-        puckId = basket.getIndex()+1
+        puckId = basket.getIndex()
         argout = self._cmdReadPuckSampleBarcodes(str(puckId))
         samples = basket.getComponents()
         for i in range(len(samples)):
             datamatrix = argout[i]
             scanned = (len(datamatrix) != 0)
             if not scanned:    
-                datamatrix = "----------"   
+                # datamatrix = "----------"   
+                datamatrix = None
             samples[i]._setInfo(samples[i].isPresent(), datamatrix, scanned)
 
     def _updateDewarBarcodes(self):
@@ -544,7 +551,8 @@ class GROB_SC(SampleChanger):
         # calculates GROB specific puck/sample number
         puck = selected.getBasketNo()
         sample = selected.getVialNo()
-        argin = [str(doubleTool), str(puck), str(sample), str(scan)]
+        print puck, sample, scan
+        argin = [str(doubleTool), str(puck-1), str(sample-1), str(scan)]
         ret = self._executeServerTask(self._cmdLoad, argin)
         if scan==1:
             self._updateSampleBarcode(selected)
@@ -591,11 +599,11 @@ class GROB_SC(SampleChanger):
             basket._setInfo(presence, basket.getID(), basket.isScanned)
             if presence:
                 sampleList=basket.getComponents()
-                argout2 = self._cmdSampleDetection(basket.getIndex()+1)
+                argout2 = self._cmdSampleDetection(basket.getIndex())
                 for j in range(len(sampleList)):
                     sample = sampleList[j]
-                    self._updateSampleBarcode(sample)
                     sample._setInfo((argout2[j]==1),sample.getID(),sample.isScanned())
+                    self._updateSampleBarcode(sample)
 
     def _updateLoadedSample(self):
         """
@@ -608,11 +616,11 @@ class GROB_SC(SampleChanger):
         """
 
         argout = self._cmdGetMountedSample()
-        if (argout[0]<= 0):
+        if (argout[0]< 0):
             new_sample = None
         else:
-            puck_id = argout[0]-1
-            sample_id = argout[1]-1
+            puck_id = argout[0]
+            sample_id = argout[1]
             new_sample = self.getComponents()[puck_id].getComponents()[sample_id]
 	
         if self.getLoadedSample() != new_sample:
