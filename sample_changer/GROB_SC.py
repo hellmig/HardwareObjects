@@ -85,6 +85,18 @@ class GROB_SC(SampleChanger):
         # Others attributs
         for channel_name in ("_chnLastError","_chnScanning","_chnCalibrating","_chnDetecting","_chnFluoScreenIsReady","_chnAnnealingToolIsReady","_chnLN2Regulating","_chnLN2Warming","_chnDewarMotorPosition","_chnDewarNumberOfPucks","_chnIsPuckDetectionUptodate"):
             setattr(self, channel_name, self.getChannelObject(channel_name))
+        for channel_name in ("_chnLid1State","_chnLid2State"):
+            setattr(self, channel_name, self.getChannelObject(channel_name))
+
+
+        # 2017-05-18-bessy-mh: begin - connect update signals to local methods
+        self._chnPathRunning.connectSignal("update", self._updateRunningState)
+        self._chnPowered.connectSignal("update", self._updatePoweredState)
+        self._chnLastError.connectSignal("update", self._updateMessage)
+        self._chnLN2Regulating.connectSignal("update", self._updateRegulationState)
+        self._chnLid1State.connectSignal("update", self._updateLid1State)
+        self._chnLid2State.connectSignal("update", self._updateLid2State)
+        # 2017-05-18-bessy-mh: end
 
         # commands
         for commande_name in ("_cmdLoad","_cmdUnload","_cmdGetMountedSample","_cmdResetMountedSample","_cmdScanSample","_cmdScanPuck","_cmdScanDewar","_cmdReadSampleBarcode","_cmdReadPuckSampleBarcodes","_cmdToolDrying","_cmdToolDryingLimit","_cmdToolDryingDuration","_cmdToolHeaterOn","_cmdToolHeaterOff","_cmdDewarHeaterOn","_cmdDewarHeaterOff"):
@@ -560,7 +572,8 @@ class GROB_SC(SampleChanger):
         return ret
 
     def _doReset(self):
-        print "_doReset"
+        ret = self._cmdSystemErrorAcknowledge()
+        return ret
 
     def _doUnload(self,sample_slot=None):
         doubleTool = self._enableUnipuckDoubleTool #enough as long as double spine tool is not used
@@ -710,6 +723,43 @@ class GROB_SC(SampleChanger):
  
     #########################           PRIVATE           #########################        
 
+    # ------------ SIGNALS ------------
+    def _updateRunningState(self, value):
+        self.emit('runningStateChanged', (value, ))
+
+    def _updatePoweredState(self, value):
+        self.emit('powerStateChanged', (value, ))
+    
+    def _updateMessage(self, value):
+        self.emit('messageChanged', (value, ))
+
+    def _updateRegulationState(self, value):
+        self.emit('regulationStateChanged', (value, ))
+
+    def _updateLid1State(self, value):
+        self.emit('lid1StateChanged', (value, ))
+
+    def _updateLid2State(self, value):
+        self.emit('lid2StateChanged', (value, ))
+
+    def connectNotify(self, signal):
+        if signal == 'runningStateChanged':
+            self.emit('runningStateChanged', self._chnPathRunning.getValue())
+        elif signal == 'powerStateChanged':
+            self.emit('powerStateChanged', self._chnPowered.getValue())
+        elif signal == 'messageChanged':
+            self.emit('messageChanged', self._chnLastError.getValue())
+        elif signal == 'regulationStateChanged':
+            self.emit('regulationStateChanged', self._chnLN2Regulating.getValue())
+        elif signal == 'lid1StateChanged':
+            self.emit('lid1StateChanged', self._chnLid1State.getValue())
+        elif signal == 'lid2StateChanged':
+            self.emit('lid2StateChanged', self._chnLid2State.getValue())
+        else:
+            logging.getLogger().info ("connectNotify " + str(signal))
+
+    # ------------ SIGNALS ------------
+
     def _executeServerTask(self, method, *args):
         """
         Executes a task on the GROB Tango device server
@@ -739,3 +789,59 @@ class GROB_SC(SampleChanger):
                 print err
                 ret = False
         return ret
+
+    def _doPowerState(self, state=False):
+        """
+        Switch on CATS power if >state< == True, power off otherwise
+
+        :returns: None
+        :rtype: None
+        """
+        if state:
+            self._cmdPowerOn()
+        else:
+            self._cmdPowerOff()
+
+    def _doEnableRegulation(self):
+        """
+        Switch on CATS regulation
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdRegulOn()
+
+    def _doDisableRegulation(self):
+        """
+        Switch off CATS regulation
+
+        :returns: None
+        :rtype: None
+        """
+        self._cmdRegulOff()
+
+    def _doLid1State(self, state = True):
+        """
+        Opens lid 1 if >state< == True, closes the lid otherwise
+
+        :returns: None
+        :rtype: None
+        """
+        argin = 1
+        if state:
+            self._executeServerTask(self._cmdOpenLid, argin)
+        else:
+            self._executeServerTask(self._cmdCloseLid, argin)
+
+    def _doLid2State(self, state = True):
+        """
+        Opens lid 2 if >state< == True, closes the lid otherwise
+
+        :returns: None
+        :rtype: None
+        """
+        argin = 2
+        if state:
+            self._executeServerTask(self._cmdOpenLid, argin)
+        else:
+            self._executeServerTask(self._cmdCloseLid, argin)
