@@ -411,7 +411,8 @@ class Microdiff(MiniDiff.MiniDiff):
         return
 
     def move_to_beam(self, x, y):
-        logging.getLogger("HWR").info("Microdiff: \"move to beam\" functionality not implemented yet.")
+        # logging.getLogger("HWR").info("Microdiff: \"move to beam\" functionality not implemented yet.")
+        MiniDiff.MiniDiff.moveToBeam(self, x, y)
 
 def set_light_in(light, light_motor, zoom):
     MICRODIFF.getDeviceByRole("flight").move(0)

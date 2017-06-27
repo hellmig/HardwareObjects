@@ -404,7 +404,7 @@ class MiniDiff(Equipment):
             beam_xc = self.getBeamPosX()
             beam_yc = self.getBeamPosY()
             self.centringPhiz.moveRelative((y-beam_yc)/float(self.pixelsPerMmZ))
-            self.centringPhiy.moveRelative((x-beam_xc)/float(self.pixelsPerMmY))
+            self.centringPhiy.moveRelative(-(x-beam_xc)/float(self.pixelsPerMmY))
         except:
             logging.getLogger("HWR").exception("MiniDiff: could not center to beam, aborting")
 
