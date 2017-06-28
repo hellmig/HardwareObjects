@@ -181,6 +181,11 @@ class Nanodiff(Equipment):
             self.grid_direction = {"fast": (0, 1), "slow": (1, 0)}
             logging.getLogger("HWR").warning('Nanodiff: Grid direction is not defined. Using default.')
 
+        # 2017-05-22-bessy-mh: begin - add channel and command to handle phase change on the Nanodiff
+        self.phasePosition = self.getChannelObject("phase_position")
+        self.startCentringPhaseCmd = self.getCommandObject("start_centring_phase_cmd")
+        # 2017-05-22-bessy-mh: end
+
         # make the diffractometer object compatible with the new graphics manager
         # in Qt4 implementation
         # ---------------------
@@ -345,6 +350,13 @@ class Nanodiff(Equipment):
 
 
     def startCentringMethod(self,method,sample_info=None):
+
+        if (self.phasePosition is not None) and self.phasePosition.getValue() != "Sample Centring":
+            # centring phase not activated yet
+            # activate the sample centring phase before starting the centring procedure
+            if self.startCentringPhaseCmd is not None:
+                self.startCentringPhaseCmd()
+
         if not self.do_centring:
             self.emitCentringStarted(method)
             def fake_centring_procedure():
