@@ -59,7 +59,7 @@ class UnipuckBasket(Basket):
 
 
 class GROB_SC(SampleChanger):
-    __TYPE__ = "GROB"
+    __TYPE__ = "GROB_SC"
 
     def __init__(self, *args, **kwargs):
         super(GROB_SC, self).__init__(self.__TYPE__,False, *args, **kwargs)
@@ -71,7 +71,7 @@ class GROB_SC(SampleChanger):
 
         # attributs
         # Process I/O 
-        for channel_name in ("_chnState", "_chnDoorIsLocked", "_chnSampleIsDetected","_chnSCTransfertStateIsOn","_chnMiniToolAnnealingStateIsOn","_chnMiniToolFluoStateIsOn","_chnSCDetectorIsBack","_chnArmPowerIsOn","_chnArmIsHome","_chnSCUnloadStateRequest","_chnSCLoadStateRequest","_chnSCArmIsOuOfGonioArea","_chnSCSampleMagnetControl","_chnMiniToolAnnealingRequest","_chnMiniToolWashingRequest","_chnMiniToolFluoRequest","_chnPathRunning"):
+        for channel_name in ("_chnState", "_chnDoorIsLocked", "_chnSampleIsDetected","_chnSCTransfertStateIsOn","_chnMiniToolAnnealingStateIsOn","_chnMiniToolFluoStateIsOn","_chnSCDetectorIsBack","_chnArmPowerIsOn","_chnArmIsHome","_chnSCUnloadStateRequest","_chnSCLoadStateRequest","_chnSCArmIsOutOfGonioArea","_chnSCSampleMagnetControl","_chnMiniToolAnnealingRequest","_chnMiniToolWashingRequest","_chnMiniToolFluoRequest","_chnPathRunning"):
             setattr(self, channel_name, self.getChannelObject(channel_name))
         # Dewar
         for channel_name in ("_chnCryoLN2Level","_chnCryoHighLevel","_chnCryoHighLevelAlarm","_chnCryoLowLevel","_chnCryoLowLevelAlarm","_chnCryoLN2FillingValve","_chnCryoGN2Valve1","_chnCryoGN2Valve2"):
@@ -134,7 +134,6 @@ class GROB_SC(SampleChanger):
 
     def sampleIsDetected(self):
         return self._chnSampleIsDetected.getValue()
-        return self._chnTransfertStateIsOn.getValue()
 
     def miniToolAnnealingStateIsOn(self):
         return self._chnMiniToolAnnealingStateIsOn.getValue()
