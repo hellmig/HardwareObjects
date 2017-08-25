@@ -1,5 +1,21 @@
 from .GenericSampleChanger import *
-from .Cats90 import Pin
+
+class Pin(Sample):
+    STD_HOLDERLENGTH = 22.0
+
+    def __init__(self,basket,basket_no,sample_no):
+        super(Pin, self).__init__(basket, Pin.getSampleAddress(basket_no,sample_no), False)
+        self._setHolderLength(Pin.STD_HOLDERLENGTH)
+
+    def getBasketNo(self):
+        return self.getContainer().getIndex()+1
+
+    def getVialNo(self):
+        return self.getIndex()+1
+
+    @staticmethod
+    def getSampleAddress(basket_number, sample_number):
+        return str(basket_number) + ":" + "%02d" % (sample_number)
 
 class BasketType:
     """
@@ -570,6 +586,10 @@ class GROB_SC(SampleChanger):
 	self._updateLoadedSample()
         return ret
 
+    def _doAckManualUnmount(self):
+        ret = self._cmdResetMountedSample()
+        return ret
+
     def _doReset(self):
         ret = self._cmdSystemErrorAcknowledge()
         return ret
@@ -782,7 +802,7 @@ class GROB_SC(SampleChanger):
             while self.state == SampleChangerState.Moving:
                 gevent.sleep(0.5)            
             self._updateState()
-            print self.state
+            # print self.state
             if self.state == SampleChangerState.Fault:
                 err = self._chnLastError.getValue()
                 print err
@@ -844,3 +864,4 @@ class GROB_SC(SampleChanger):
             self._executeServerTask(self._cmdOpenLid, argin)
         else:
             self._executeServerTask(self._cmdCloseLid, argin)
+
