@@ -1,5 +1,21 @@
-from .GenericSampleChanger import *
-from .Cats90 import Pin
+from sample_changer.GenericSampleChanger import *
+
+class Pin(Sample):
+    STD_HOLDERLENGTH = 22.0
+
+    def __init__(self,basket,basket_no,sample_no):
+        super(Pin, self).__init__(basket, Pin.getSampleAddress(basket_no,sample_no), False)
+        self._setHolderLength(Pin.STD_HOLDERLENGTH)
+
+    def getBasketNo(self):
+        return self.getContainer().getIndex()+1
+
+    def getVialNo(self):
+        return self.getIndex()+1
+
+    @staticmethod
+    def getSampleAddress(basket_number, sample_number):
+        return str(basket_number) + ":" + "%02d" % (sample_number)
 
 class BasketType:
     """
@@ -580,6 +596,10 @@ class GROB_SC(SampleChanger):
         if scan==1:
             self._updateSampleBarcode(selected)
 	self._updateLoadedSample()
+        return ret
+
+    def _doAckManualUnmount(self):
+        ret = self._cmdResetMountedSample()
         return ret
 
     def _doReset(self):
