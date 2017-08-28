@@ -181,10 +181,17 @@ class Nanodiff(Equipment):
             self.grid_direction = {"fast": (0, 1), "slow": (1, 0)}
             logging.getLogger("HWR").warning('Nanodiff: Grid direction is not defined. Using default.')
 
-        # 2017-05-22-bessy-mh: begin - add channel and command to handle phase change on the Nanodiff
-        self.phasePosition = self.getChannelObject("phase_position")
-        self.startCentringPhaseCmd = self.getCommandObject("start_centring_phase_cmd")
-        # 2017-05-22-bessy-mh: end
+        # 2017-08-28-bessy-mh: begin - add processing of transfer state requests, moved here from GROB_SC
+        for channel_name in ("_chnLoadStateRequest","_chnUnloadStateRequest", "_chnNanodiffCurrentPhase"):
+            setattr(self, channel_name, self.getChannelObject(channel_name))
+        if self._chnLoadStateRequest is not None:
+            self._chnLoadStateRequest.connectSignal("update", self._loadRequestStateChanged)
+        if self._chnUnloadStateRequest is not None:
+            self._chnUnloadStateRequest.connectSignal("update", self._unloadRequestStateChanged)
+
+        for commande_name in ("_cmdStartTransferPhase", "_cmdStartCentringPhase"):
+            setattr(self, commande_name, self.getCommandObject(commande_name))
+        # 2017-08-28-bessy-mh: end
 
         # make the diffractometer object compatible with the new graphics manager
         # in Qt4 implementation
@@ -351,11 +358,11 @@ class Nanodiff(Equipment):
 
     def startCentringMethod(self,method,sample_info=None):
 
-        if (self.phasePosition is not None) and self.phasePosition.getValue() != "Sample Centring":
+        if (self._chnNanodiffCurrentPhase is not None) and self._chnNanodiffCurrentPhase.getValue() != "Sample Centring":
             # centring phase not activated yet
             # activate the sample centring phase before starting the centring procedure
-            if self.startCentringPhaseCmd is not None:
-                self.startCentringPhaseCmd()
+            if self._cmdStartCentringPhase is not None:
+                self._cmdStartCentringPhase()
 
         if not self.do_centring:
             self.emitCentringStarted(method)
@@ -642,3 +649,28 @@ class Nanodiff(Equipment):
 
         return
 
+    def _loadRequestStateChanged(self, value):
+        # print "Nanodiff._loadRequestStateChanged", value
+        if value:
+            # Load request received, try to go to transfer phase
+            self._enableGonioTransferPhase()
+        else:
+            # Load request disabled
+            if self.sampleChanger is not None:
+                if self.sampleChanger.sampleIsDetected() and self.sampleChanger.armIsOutOfGonioArea():
+                    if self._cmdStartCentringPhase is not None:
+                        self._cmdStartCentringPhase()
+
+    def _unloadRequestStateChanged(self, value):
+        # print "Nanodiff._unloadRequestStateChanged", value
+        if value:
+            # Unload request received, try to go to transfer phase
+            self._enableGonioTransferPhase()
+
+    def _enableGonioTransferPhase(self):
+        # print "Nanodiff._enableGonioTransferPhase"
+        if self._chnNanodiffCurrentPhase:
+            if self._chnNanodiffCurrentPhase.getValue() != "Sample Transfer":
+
+                if self._cmdStartTransferPhase is not None:
+                    self._cmdStartTransferPhase()

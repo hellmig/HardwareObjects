@@ -128,18 +128,6 @@ class GROB_SC(SampleChanger):
         for commande_name in ("_cmdPowerOn","_cmdPowerOff","_cmdBackTraj","_cmdAbort","_cmdStop","_cmdRestart","_cmdReset","_cmdHome","_cmdSafe","_cmdMountTool","_cmdUnmountTool","_cmdOpenTool","_cmdCloseTool","_cmdAlarmAcknowledge","_cmdShuntACOn","_cmdShuntACOff","_cmdSystemErrorAcknowledge"):
             setattr(self, commande_name, self.getCommandObject(commande_name))
 
-        # 2017-05-22-bessy-mh: begin - add processing of transfer state requests
-        for channel_name in ("_chnLoadStateRequest","_chnUnloadStateRequest", "_chnNanodiffCurrentPhase"):
-            setattr(self, channel_name, self.getChannelObject(channel_name))
-        if self._chnLoadStateRequest is not None:
-            self._chnLoadStateRequest.connectSignal("update", self._loadRequestStateChanged)
-        if self._chnUnloadStateRequest is not None:
-            self._chnUnloadStateRequest.connectSignal("update", self._unloadRequestStateChanged)
-
-        for commande_name in ("_cmdStartTransferPhase", "_cmdStartCentringPhase"):
-            setattr(self, commande_name, self.getCommandObject(commande_name))
-        # 2017-05-22-bessy-mh: end
-
         # initialize the sample changer components
         nbPucks = self.numberOfPucks()
         for i in range (nbPucks):
@@ -877,29 +865,3 @@ class GROB_SC(SampleChanger):
         else:
             self._executeServerTask(self._cmdCloseLid, argin)
 
-    def _loadRequestStateChanged(self, value):
-        print "GROB._loadRequestStateChanged", value
-        if value:
-            # Load request received, try to go to transfer phase
-            self._enableGonioTransferPhase()
-        else:
-            # Load request disabled
-            if self.sampleIsDetected() and self.armIsOutOfGonioArea():
-                if self._cmdStartCentringPhase is not None:
-                    self._cmdStartCentringPhase()
-
-    def _unloadRequestStateChanged(self, value):
-        print "GROB._unloadRequestStateChanged", value
-        if value:
-            # Unload request received, try to go to transfer phase
-            self._enableGonioTransferPhase()
-
-    def _enableGonioTransferPhase(self):
-        if self._chnNanodiffCurrentPhase:
-            if self._chnNanodiffCurrentPhase.getValue() != "Sample Transfer":
-                print "Command start_transfer_phase triggered"
-
-                if self._cmdStartTransferPhase is not None:
-                    self._cmdStartTransferPhase()
-            else:
-                print "Transfer phase already active"
