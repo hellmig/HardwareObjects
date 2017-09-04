@@ -9,6 +9,12 @@ class MachCurrentEpics(BaseHardwareObjects.Device):
         self.fillModeStr = None
         self.lifeTimeValue = None
 
+        # adapt method names to new AbstractCollect class
+        # TO-DO: migrate all identifier names to PEP8 conventions
+        self.get_current = self.getCurrent
+        self.get_message = self.getMessage
+        self.get_fill_mode = self.getFillMode
+
     def init(self):
         try:
             self.ringCurrent = self.getChannelObject('ring_current')
@@ -72,7 +78,7 @@ class MachCurrentEpics(BaseHardwareObjects.Device):
         return self.machValue
 
     def getMessage(self):
-        pass
+        return ''
 
     def getFillMode(self):
         #return self.getChannelObject('fill_mode').getValue()
