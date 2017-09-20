@@ -73,3 +73,18 @@ class BESSY141BeamInfo(BeamInfo):
         self.evaluate_beam_info() 
         self.emit_beam_info_change()
 
+    def get_slits_gap(self):
+        """
+        Descript. : Dummy implementation, no slits used at BESSY 14.1.
+        Arguments : None
+        Return    : (None, None)
+        """
+        return None, None
+
+    def get_shape(self):
+        """
+        Descript. : Dummy implementation.
+        Arguments : None
+        Return    : "circular"
+        """
+        return "circular"

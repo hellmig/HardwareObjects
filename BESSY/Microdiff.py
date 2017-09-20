@@ -145,6 +145,12 @@ class Microdiff(MiniDiff.MiniDiff):
         self.get_centring_status = self.getCentringStatus 
         self.take_snapshots = self.takeSnapshots 
         self.move_motors = self.moveMotors 
+        self.osc_scan = self.oscilScan
+        self.osc_scan_4d = self.oscilScan4d
+        self.get_positions = self.getPositions
+        self.get_current_phase = self.getPhase
+        self.set_phase = self.moveToPhase
+        self.move_sync_motors = self.moveSyncMotors
         # self.is_ready = self.isReady
         # ---------------------
 
@@ -413,6 +419,13 @@ class Microdiff(MiniDiff.MiniDiff):
     def move_to_beam(self, x, y):
         # logging.getLogger("HWR").info("Microdiff: \"move to beam\" functionality not implemented yet.")
         MiniDiff.MiniDiff.moveToBeam(self, x, y)
+
+    def move_omega_relative(self, relative_angle):
+        """
+        Description:
+        """
+        self.phiMotor.syncMoveRelative(relative_angle, 5)
+
 
 def set_light_in(light, light_motor, zoom):
     MICRODIFF.getDeviceByRole("flight").move(0)
