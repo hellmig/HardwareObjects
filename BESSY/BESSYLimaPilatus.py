@@ -10,7 +10,7 @@ from PyTango import DeviceProxy
 class Pilatus:
 
   def init(self, config):
-      print "***** BESSY/LimaPilatus2.init"
+      # print "***** BESSYLimaPilatus.init"
       self.config = config
       self.header = dict()
  
