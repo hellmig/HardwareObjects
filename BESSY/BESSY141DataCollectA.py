@@ -12,7 +12,6 @@ from HardwareRepository.TaskUtils import *
 from HardwareRepository.BaseHardwareObjects import HardwareObject
 from AbstractCollect import AbstractCollect
 
-from LimaPilatus import Pilatus
 
 class BESSY141DataCollectA(AbstractCollect, HardwareObject):
     """
@@ -46,9 +45,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         self.helical_pos = None
         self.ready_event = None
 
-        # set up real detector hardware object
-        self._detector = Pilatus()
-
         self.exp_type_dict = None
 
         self._notify_greenlet = None
@@ -67,29 +63,18 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.init"
- 
         self.ready_event = gevent.event.Event()
         self.diffractometer_hwobj = self.getObjectByRole("diffractometer")
-        print self.diffractometer_hwobj
         self.lims_client_hwobj = self.getObjectByRole("lims_client")
         self.machine_info_hwobj = self.getObjectByRole("machine_info")
         self.energy_hwobj = self.getObjectByRole("energy")
         self.resolution_hwobj = self.getObjectByRole("resolution")
         self.detector_hwobj = self.getObjectByRole("detector")
-        print self.detector_hwobj
         self.autoprocessing_hwobj = self.getObjectByRole("auto_processing")
         self.beam_info_hwobj = self.getObjectByRole("beam_info")
         self.transmission_hwobj = self.getObjectByRole("transmission")
         self.detector_distance_hwobj = self.getObjectByRole("detector_distance")
         self.graphics_manager_hwobj = self.getObjectByRole("graphics_manager")
-
-        self._detector.addCommand = self.addCommand
-        self._detector.addChannel = self.addChannel
-        self._detector.getCommandObject = self.getCommandObject
-        self._detector.getChannelObject = self.getChannelObject
-        # 2017-09-08-bessy-mh: configure internal LImA detector object
-        self._detector.init(self.detector_hwobj, self)
 
         #todo
         self.detector_cover_hwobj = self.getObjectByRole("detector_cover") #use mockup now
@@ -259,8 +244,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Main collection command
         """
-        print "***** BESSY141DataCollectA.data_collection_hook"
-
         try:
             oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 
@@ -276,18 +259,18 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
             self.open_safety_shutter()
             #make sure detector configuration is finished
             # self._detector.wait_config_done()
-            self._detector.start_acquisition()
+            self.detector_hwobj.start_acquisition()
             # call after start_acquisition (detector is armed), when all the config parameters are definitely
             # implemented
             # shutterless_exptime = self._detector.get_acquisition_time()
 
             _exptime = oscillation_parameters['exposure_time']
             _number_of_images = oscillation_parameters['number_of_images']
-            _detector_dead_time = self._detector.get_deadtime()
+            _detector_dead_time = self.detector_hwobj.get_deadtime()
             _shutterless_exptime = _number_of_images * (_exptime + _detector_dead_time)
             
             self.oscillation_task = self.oscil(osc_start, osc_end, _shutterless_exptime, 1, wait=True)
-            self._detector.stop()
+            self.detector_hwobj.stop()
 
             self.close_safety_shutter()
             self.close_detector_cover()
@@ -551,7 +534,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         return 1000
 
     def prepare_detector(self):
-
+        
         oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 
         _osc_range = oscillation_parameters["range"]
@@ -568,9 +551,23 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         _number_of_images = oscillation_parameters['number_of_images']
         _comment = "dummy"
 
-        self._detector.prepare_acquisition(
+        # insert here acq_params dictionary:
+        _acq_params = {}
+        _acq_params["kappa_phi"] = self.current_dc_parameters['motors'].get("kappa_phi", None)
+        _acq_params["kappa"] = self.current_dc_parameters['motors'].get("kappa", None)
+        _acq_params["polarisation"] = self.bl_config.polarisation
+        _acq_params["transmission"] = self.get_transmission()
+        _acq_params["flux"] = self.get_flux()
+        _acq_params["beam_x"] = self.get_beam_centre()[0] / self.bl_config.detector_px
+        _acq_params["beam_y"] = self.get_beam_centre()[1] / self.bl_config.detector_py
+        # 2017-09-12-bessy-mh: CBF header expects detector distance in [m]
+        _acq_params["detector_distance"] = self.get_detector_distance() / 1000.0
+        _acq_params["wavelength"] = self.get_wavelength()
+  
+        # 2017-09-08-mh: customize to BESSY environment
+        self.detector_hwobj.prepare_acquisition(
             _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
-            _comment, _energy, _still)
+            _comment, _energy, _still, _acq_params)
 
         # Preparing directory path for images and processing files
         # creating image file template and jpegs files templates
@@ -586,7 +583,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         _jpeg_full_path = None
         _jpeg_thumbnail_full_path = None
 
-        self._detector.set_detector_filenames(_start_image_number, _omega_start, str(_file_path), str(_jpeg_full_path), str(_jpeg_thumbnail_full_path))
+        self.detector_hwobj.set_detector_filenames(_start_image_number, _omega_start, str(_file_path), str(_jpeg_full_path), str(_jpeg_thumbnail_full_path))
         return
 
     def get_transmission(self):
@@ -738,8 +735,8 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         Descript. :
         """
         if self.detector_hwobj is not None:
-            beam_x = self.detector_hwobj.getProperty("px")
-            beam_y = self.detector_hwobj.getProperty("py")
+            beam_x = self.detector_hwobj["beam"].getProperty("bx")
+            beam_y = self.detector_hwobj["beam"].getProperty("by")
             return (beam_x, beam_y)
         else:
             return (None, None)
@@ -748,7 +745,12 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Descript. : 
         """
+        log = logging.getLogger("user_level_log")
         print "***** BESSY141DataCollectA.take_crystal_snapshots"
+        #move MD2 to DataCollection phase if it's not
+        if self.diffractometer_hwobj.get_current_phase() != "Centring":
+            log.info("Moving diffractometer to centring phase")
+            self.diffractometer_hwobj.set_phase("Centring", wait=True, timeout=200)
         # 2017-09-12-bessy-mh: rewrite saving directory for the snapshots
         #                      TO-DO: introduce new configuration value
         #                      for aux data and/or Xtal snapshots
