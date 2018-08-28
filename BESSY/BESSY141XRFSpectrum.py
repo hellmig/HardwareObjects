@@ -28,13 +28,8 @@ from BESSYAbstractXRFSpectrum import BESSYAbstractXRFSpectrum
 from HardwareRepository.BaseHardwareObjects import HardwareObject
 
 
-__author__ = "Ivars Karpics"
-__credits__ = ["MXCuBE colaboration"]
-
-__version__ = "2.2."
-__maintainer__ = "Ivars Karpics"
-__email__ = "ivars.karpics[at]embl-hamburg.de"
-__status__ = "Draft"
+__maintainer__ = "Michael Hellmig"
+__email__ = "michael.hellmig[at]helmholtz-berlin.de"
 
 
 class BESSY141XRFSpectrum(BESSYAbstractXRFSpectrum, HardwareObject):
