@@ -244,6 +244,15 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Main collection command
         """
+
+        parameters = self.current_dc_parameters
+
+        log = logging.getLogger("user_level_info")
+        log.info("data collection parameters received %s" % parameters)
+
+        for parameter in parameters:
+            log.info("%s: %s" % (str(parameter), str(parameters[parameter])))
+
         try:
             oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 

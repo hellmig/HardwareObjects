@@ -130,7 +130,7 @@ class Pilatus:
       if still:
           self.getChannelObject("acq_trigger_mode").setValue("INTERNAL_TRIGGER")
       else:
-          self.getChannelObject("acq_trigger_mode").setValue("EXTERNAL_TRIGGER")
+          self.getChannelObject("acq_trigger_mode").setValue("EXTERNAL_TRIGGER_MULTI")
 
       self.getChannelObject("saving_mode").setValue("AUTO_FRAME")
       self.getChannelObject("acq_nb_frames").setValue(number_of_images)
