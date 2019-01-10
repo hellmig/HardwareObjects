@@ -244,7 +244,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Main collection command
         """
-
         parameters = self.current_dc_parameters
 
         log = logging.getLogger("user_level_info")
@@ -253,51 +252,103 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         for parameter in parameters:
             log.info("%s: %s" % (str(parameter), str(parameters[parameter])))
 
-        try:
-            oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
+        experiment_type = parameters["experiment_type"]
 
-            # 2017-08-31-bessy-mh: migrate from BESSY141MultiCollect
-            self.getChannelObject("parameters").setValue(oscillation_parameters)
-            self.execute_command("build_collect_seq")
-            self.execute_command("prepare_beamline")
+        if (experiment_type == "OSC") or (experiment_type == "Helical"):
+            print "data_collection_hook: Standard shutterless data collection or Helical"
 
-            osc_start = oscillation_parameters['start']
-            osc_end = osc_start + oscillation_parameters["range"] * \
-                oscillation_parameters['number_of_images']
-            self.open_detector_cover()
-            self.open_safety_shutter()
-            #make sure detector configuration is finished
-            # self._detector.wait_config_done()
-            self.detector_hwobj.start_acquisition()
-            # call after start_acquisition (detector is armed), when all the config parameters are definitely
-            # implemented
-            # shutterless_exptime = self._detector.get_acquisition_time()
+            try:
+                oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 
-            _exptime = oscillation_parameters['exposure_time']
-            _number_of_images = oscillation_parameters['number_of_images']
-            _detector_dead_time = self.detector_hwobj.get_deadtime()
-            _shutterless_exptime = _number_of_images * (_exptime + _detector_dead_time)
-            
-            self.oscillation_task = self.oscil(osc_start, osc_end, _shutterless_exptime, 1, wait=True)
-            self.detector_hwobj.stop()
+                # 2017-08-31-bessy-mh: migrate from BESSY141MultiCollect
+                self.getChannelObject("parameters").setValue(oscillation_parameters)
+                self.execute_command("build_collect_seq")
+                self.execute_command("prepare_beamline")
 
-            self.close_safety_shutter()
-            self.close_detector_cover()
-            self.emit("collectImageTaken", oscillation_parameters['number_of_images'])
-            # 2017-09-12-bessy-mh: call SPEC cleanup macro to finalize data collection
-            self.execute_command("data_collection_cleanup")
-        except:
-            # 2017-09-12-bessy-mh: method data_collection_cleanup for ERROR cleanup only!
-            #                      TO-DO: optimise naming
-            self.data_collection_cleanup()
-            raise Exception("data collection hook failed")
+                osc_start = oscillation_parameters['start']
+                osc_end = osc_start + oscillation_parameters["range"] * \
+                    oscillation_parameters['number_of_images']
+                self.open_detector_cover()
+                self.open_safety_shutter()
+                #make sure detector configuration is finished
+                # self._detector.wait_config_done()
+                self.detector_hwobj.start_acquisition()
+                # call after start_acquisition (detector is armed), when all the config parameters are definitely
+                # implemented
+                # shutterless_exptime = self._detector.get_acquisition_time()
 
-    def oscil(self, start, end, exptime, npass, wait = True):
-        print "***** BESSY141DataCollectA.oscil", self.helical, start, end, exptime, npass, wait
-        if self.helical:
-            self.diffractometer_hwobj.osc_scan_4d(start, end, exptime, self.helical_pos, wait=True)
+                _exptime = oscillation_parameters['exposure_time']
+                _number_of_images = oscillation_parameters['number_of_images']
+                _detector_dead_time = self.detector_hwobj.get_deadtime()
+                _shutterless_exptime = _number_of_images * (_exptime + _detector_dead_time)
+
+                self.oscillation_task = self.oscil(osc_start, osc_end, _shutterless_exptime, 1, _number_of_images, wait=True)
+                self.detector_hwobj.stop()
+
+                self.close_safety_shutter()
+                self.close_detector_cover()
+                self.emit("collectImageTaken", oscillation_parameters['number_of_images'])
+                # 2017-09-12-bessy-mh: call SPEC cleanup macro to finalize data collection
+                self.execute_command("data_collection_cleanup")
+            except:
+                # 2017-09-12-bessy-mh: method data_collection_cleanup for ERROR cleanup only!
+                #                      TO-DO: optimise naming
+                self.data_collection_cleanup()
+                raise Exception("data collection hook failed")
+        elif experiment_type == "Characterization":
+            print "data_collection_hook: Characterization"
+
+            try:
+                oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
+
+                # 2017-08-31-bessy-mh: migrate from BESSY141MultiCollect
+                self.getChannelObject("parameters").setValue(oscillation_parameters)
+
+                self.execute_command("build_collect_seq")
+                self.execute_command("prepare_beamline")
+
+                self.open_detector_cover()
+                self.open_safety_shutter()
+                #make sure detector configuration is finished
+                # self._detector.wait_config_done()
+                self.detector_hwobj.start_acquisition()
+                # call after start_acquisition (detector is armed), when all the config parameters are definitely
+                # implemented
+                # shutterless_exptime = self._detector.get_acquisition_time()
+
+                _exptime = oscillation_parameters['exposure_time']
+                _number_of_images = oscillation_parameters['number_of_images']
+                _detector_dead_time = self.detector_hwobj.get_deadtime()
+                _overlap = oscillation_parameters['overlap']
+                _range = oscillation_parameters['range']
+
+                for i in range(_number_of_images):
+                    osc_start = oscillation_parameters['start'] + (_range - _overlap) * i
+                    osc_end = osc_start + _range
+                    self.oscillation_task = self.oscil(osc_start, osc_end, _exptime, 1, _number_of_images, wait=True)
+
+                self.detector_hwobj.stop()
+
+                self.close_safety_shutter()
+                self.close_detector_cover()
+                self.emit("collectImageTaken", oscillation_parameters['number_of_images'])
+                # 2017-09-12-bessy-mh: call SPEC cleanup macro to finalize data collection
+                self.execute_command("data_collection_cleanup")
+            except:
+                # 2017-09-12-bessy-mh: method data_collection_cleanup for ERROR cleanup only!
+                #                      TO-DO: optimise naming
+                self.data_collection_cleanup()
+                raise Exception("data collection hook failed")
         else:
-            self.diffractometer_hwobj.osc_scan(start, end, exptime, wait=True)
+            print "data_collection_hook: Unknown data collection type"
+
+
+    def oscil(self, start, end, exptime, npass, number_of_frames, wait = True):
+        print "***** BESSY141DataCollectA.oscil: ", self.helical, start, end, exptime, npass, number_of_frames, wait
+        if self.helical:
+            self.diffractometer_hwobj.osc_scan_4d(start, end, exptime, number_of_frames, self.helical_pos, wait=True)
+        else:
+            self.diffractometer_hwobj.osc_scan(start, end, exptime, number_of_frames, wait=True)
 
 
     def emit_collection_failed(self):
@@ -543,8 +594,12 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         return 1000
 
     def prepare_detector(self):
-        
+
         oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
+
+        parameters = self.current_dc_parameters
+
+        experiment_type = parameters["experiment_type"]
 
         _osc_range = oscillation_parameters["range"]
         if _osc_range < 1E-4:
@@ -572,11 +627,23 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         # 2017-09-12-bessy-mh: CBF header expects detector distance in [m]
         _acq_params["detector_distance"] = self.get_detector_distance() / 1000.0
         _acq_params["wavelength"] = self.get_wavelength()
-  
-        # 2017-09-08-mh: customize to BESSY environment
-        self.detector_hwobj.prepare_acquisition(
-            _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
-            _comment, _energy, _still, _acq_params)
+
+        # 2019-01-04-bessy-mh: overlap parameter for characterizations
+        _acq_params["overlap"] = oscillation_parameters["overlap"]
+
+        if (experiment_type == "OSC") or (experiment_type == "Helical"):
+            print "prepare_detector: Standard/Helical shutterless data collection"
+            # 2017-09-08-mh: customize to BESSY environment
+            self.detector_hwobj.prepare_acquisition(
+                _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
+                _comment, _energy, _still, _acq_params)
+        elif experiment_type == "Characterization":
+            print "prepare_detector: Characterization"
+            self.detector_hwobj.prepare_acquisition_single(
+                _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
+                _comment, _energy, _still, _acq_params)
+        else:
+           print "prepare_detector: Unknown data collection type"
 
         # Preparing directory path for images and processing files
         # creating image file template and jpegs files templates

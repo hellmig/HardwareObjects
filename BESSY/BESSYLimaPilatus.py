@@ -137,6 +137,62 @@ class Pilatus:
       self.getChannelObject("acq_expo_time").setValue(exptime)
       self.getChannelObject("saving_overwrite_policy").setValue("OVERWRITE")
 
+  @task
+  def prepare_acquisition_single(self, take_dark, start, osc_range, exptime, npass, number_of_images, comment, energy, still, acq_params):
+      self.start_angles = list()
+      for i in range(number_of_images):
+        self.start_angles.append("%0.4f deg." % (start+(osc_range - acq_params["overlap"])*i))
+      self.header["file_comments"]=comment
+      self.header["N_oscillations"]=number_of_images
+      self.header["Oscillation_axis"]="omega"
+      self.header["Chi"]="0.0000 deg."
+      kappa_phi = acq_params.get("kappa_phi", -9999)
+      if kappa_phi is None:
+          kappa_phi = -9999
+      kappa = acq_params.get("kappa", -9999)
+      if kappa is None:
+          kappa = -9999
+      self.header["Phi"]="%0.4f deg." % kappa_phi
+      self.header["Kappa"]="%0.4f deg." % kappa
+      self.header["Alpha"]="0.0000 deg."
+      self.header["Polarization"]=acq_params["polarisation"]
+      self.header["Detector_2theta"]="0.0000 deg."
+      self.header["Angle_increment"]="%0.4f deg." % osc_range
+      #self.header["Start_angle"]="%0.4f deg." % start
+      self.header["Transmission"]=acq_params["transmission"]
+      self.header["Flux"]=acq_params["flux"]
+      self.header["Beam_xy"]="(%.2f, %.2f) pixels" % (acq_params["beam_x"], acq_params["beam_y"])
+      self.header["Detector_Voffset"]="0.0000 m"
+      self.header["Energy_range"]="(0, 0) eV"
+      self.header["Detector_distance"]="%f m" % acq_params["detector_distance"]
+      self.header["Wavelength"]="%f A" % acq_params["wavelength"]
+      self.header["Trim_directory:"]="(nil)"
+      self.header["Flat_field:"]="(nil)"
+      self.header["Excluded_pixels:"]=" badpix_mask.tif"
+      self.header["N_excluded_pixels:"]="= 321"
+      self.header["Threshold_setting"]="%d eV" % self.getChannelObject("threshold").getValue()
+      self.header["Count_cutoff"]="1048500"
+      self.header["Tau"]="= 0 s"
+      self.header["Exposure_period"]="%f s" % (exptime+self.get_deadtime())
+      self.header["Exposure_time"]="%f s" % exptime
+
+      self.stop()
+      self.wait_ready()
+
+      self.set_energy_threshold(energy)
+
+      if still:
+          self.getChannelObject("acq_trigger_mode").setValue("INTERNAL_TRIGGER")
+      else:
+          self.getChannelObject("acq_trigger_mode").setValue("EXTERNAL_TRIGGER_MULTI")
+
+      self.getChannelObject("saving_mode").setValue("AUTO_FRAME")
+      self.getChannelObject("acq_nb_frames").setValue(number_of_images)
+      self.getChannelObject("acq_expo_time").setValue(exptime)
+      self.getChannelObject("saving_overwrite_policy").setValue("OVERWRITE")
+
+
+
   def set_energy_threshold(self, energy):  
       minE = self.config.get("minE", None)
       if energy < minE:

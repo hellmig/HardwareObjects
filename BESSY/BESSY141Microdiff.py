@@ -516,7 +516,7 @@ class BESSY141Microdiff(GenericDiffractometer):
         """
         raise NotImplementedException
 
-    def osc_scan(self, start, end, exptime, wait=False):
+    def osc_scan(self, start, end, exptime, number_of_frames, wait=False):
         if self.in_plate_mode():
             scan_speed = math.fabs(end-start) / exptime
             low_lim, hi_lim = map(float, self.scanLimits(scan_speed))
@@ -527,13 +527,14 @@ class BESSY141Microdiff(GenericDiffractometer):
 
         scan_params = "1\t%0.3f\t%0.3f\t%0.4f\t1"% (start, (end-start), exptime)
         scan = self.addCommand({"type":"exporter", "exporter_address": self.exporter_addr, "name": "start_scan"}, "startScanEx")
+        self.addChannel({ "type":"exporter", "exporter_address": self.exporter_addr, "name": "number_of_frames" }, "ScanNumberOfFrames").setValue(number_of_frames)
         scan(scan_params)
         print "scan started at ----------->", time.time()
         if wait:
             self.wait_device_ready(300) #timeout of 5 min
             print "finished at ---------->", time.time()
 
-    def osc_scan_4d(self, start, end, exptime,  motors_pos, wait=False):
+    def osc_scan_4d(self, start, end, exptime, number_of_frames, motors_pos, wait=False):
         if self.in_plate_mode():
             scan_speed = math.fabs(end-start) / exptime
             low_lim, hi_lim = map(float, self.scanLimits(scan_speed))
@@ -553,6 +554,7 @@ class BESSY141Microdiff(GenericDiffractometer):
         scan_params += "%0.3f" % motors_pos['2']['sampy']
 
         scan = self.addCommand({"type":"exporter", "exporter_address":self.exporter_addr, "name":"start_scan4d" }, "startScan4DEx")
+        self.addChannel({ "type":"exporter", "exporter_address": self.exporter_addr, "name": "number_of_frames" }, "ScanNumberOfFrames").setValue(number_of_frames)
         scan(scan_params)
         print "scan started at ----------->", time.time()
         if wait:

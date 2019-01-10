@@ -111,6 +111,14 @@ class BESSY141Pilatus(AbstractDetector, HardwareObject):
                    take_dark, start, osc_range, exptime, npass, number_of_images,
                    comment, energy, still, acq_params)
 
+    def prepare_acquisition_single(
+            self, take_dark, start, osc_range, exptime,
+            npass, number_of_images, comment, energy, still, acq_params):
+        """Configure aquisition parameters on the detector"""
+        return self._detector.prepare_acquisition_single(
+                   take_dark, start, osc_range, exptime, npass, number_of_images,
+                   comment, energy, still, acq_params)
+
     def set_detector_filenames(
             self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
         """Configure file parameters on the detector"""
