@@ -76,6 +76,11 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         self.detector_distance_hwobj = self.getObjectByRole("detector_distance")
         self.graphics_manager_hwobj = self.getObjectByRole("graphics_manager")
 
+        self.chan_last_image_saved = self.addChannel({"type":"tango", "name": "last_image_saved", "polling":"events", "tangoname": "bl141/lima/camera"}, "last_image_saved")
+        print self.chan_last_image_saved
+        print self.chan_last_image_saved.getValue()
+        self.connect(self.chan_last_image_saved, "update", self.last_image_updated)
+
         #todo
         self.detector_cover_hwobj = self.getObjectByRole("detector_cover") #use mockup now
         self.safety_shutter_hwobj = self.getObjectByRole("safety_shutter")
@@ -838,3 +843,17 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         # switch back to standard archive directory
         self.current_dc_parameters["fileinfo"]["archive_directory"] = save_dir
         
+    def last_image_updated(self, value):
+        if value > 0:
+            self.emit("collectImageTaken", int(value))
+
+            _image_file_template = self.current_dc_parameters["fileinfo"]["template"]
+            _filename = _image_file_template % int(value)
+            _file_location = self.current_dc_parameters["fileinfo"]["directory"]
+            _file_path  = os.path.join(_file_location, _filename)
+
+            self.last_image_filename = _file_path
+
+    def collectImageTakenHandler(self, frame):
+        if self._notify_greenlet is None or self._notify_greenlet.ready():
+            self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
