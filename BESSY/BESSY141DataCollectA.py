@@ -8,6 +8,7 @@ import os
 import logging
 import gevent
 import time
+import socket
 from HardwareRepository.TaskUtils import *
 from HardwareRepository.BaseHardwareObjects import HardwareObject
 from AbstractCollect import AbstractCollect
@@ -77,8 +78,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         self.graphics_manager_hwobj = self.getObjectByRole("graphics_manager")
 
         self.chan_last_image_saved = self.addChannel({"type":"tango", "name": "last_image_saved", "polling":"events", "tangoname": "bl141/lima/camera"}, "last_image_saved")
-        print self.chan_last_image_saved
-        print self.chan_last_image_saved.getValue()
         self.connect(self.chan_last_image_saved, "update", self.last_image_updated)
 
         #todo
@@ -260,8 +259,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         experiment_type = parameters["experiment_type"]
 
         if (experiment_type == "OSC") or (experiment_type == "Helical"):
-            print "data_collection_hook: Standard shutterless data collection or Helical"
-
             try:
                 oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 
@@ -301,8 +298,6 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
                 self.data_collection_cleanup()
                 raise Exception("data collection hook failed")
         elif experiment_type == "Characterization":
-            print "data_collection_hook: Characterization"
-
             try:
                 oscillation_parameters = self.current_dc_parameters["oscillation_sequence"][0]
 
@@ -349,7 +344,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
 
 
     def oscil(self, start, end, exptime, npass, number_of_frames, wait = True):
-        print "***** BESSY141DataCollectA.oscil: ", self.helical, start, end, exptime, npass, number_of_frames, wait
+        # print "***** BESSY141DataCollectA.oscil: ", self.helical, start, end, exptime, npass, number_of_frames, wait
         if self.helical:
             self.diffractometer_hwobj.osc_scan_4d(start, end, exptime, number_of_frames, self.helical_pos, wait=True)
         else:
@@ -409,7 +404,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.trigger_auto_processing", process_event, params_dict, frame_number
+        # print "***** BESSY141DataCollectA.trigger_auto_processing", process_event, params_dict, frame_number
         # if self.autoprocessing_hwobj is not None:
         #     self.autoprocessing_hwobj.execute_autoprocessing(process_event,
         #                                                      self.current_dc_parameters,
@@ -419,7 +414,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.open_detector_cover"
+        # print "***** BESSY141DataCollectA.open_detector_cover"
         pass
         # try:
         #     self.detector_cover_hwobj.set_out()
@@ -464,14 +459,14 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA._take_crystal_snapshot", filename
+        # print "***** BESSY141DataCollectA._take_crystal_snapshot", filename
         self.graphics_manager_hwobj.save_scene_snapshot(filename)
 
     def set_detector_roi(self, value):
         """
         Set the detector roi mode
         """
-        print "***** BESSY141DataCollectA.set_detector_roi", value
+        # print "***** BESSY141DataCollectA.set_detector_roi", value
         # self.detector_hwobj.set_roi_mode(value)
         pass
 
@@ -492,7 +487,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         p2AlignmY, p2AlignmZ, p2CentrX, p2CentrY               
         arg["2"]["phiy"], arg["2"]["phiz"], arg["2"]["sampx"], arg["2"]["sampy"]
         """
-        print "***** BESSY141DataCollectA.set_helical_pos", helical_oscil_pos
+        # print "***** BESSY141DataCollectA.set_helical_pos", helical_oscil_pos
         self.helical_pos = helical_oscil_pos
 
 
@@ -500,7 +495,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.set_resolution", value
+        # print "***** BESSY141DataCollectA.set_resolution", value
 
         """ todo, move detector,
             but then should be done after set energy and roi
@@ -508,16 +503,18 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         pass
 
     def set_energy(self, value):
-        print "***** BESSY141DataCollectA.set_energy", value
+        # print "***** BESSY141DataCollectA.set_energy", value
         #todo,disabled temp
         #self.energy_hwobj.set_energy(value)
         #self.detector_hwobj.set_photon_energy(value*1000)
+        pass
 
     def set_wavelength(self, value):
-        print "***** BESSY141DataCollectA.set_wavelength", value
+        # print "***** BESSY141DataCollectA.set_wavelength", value
         #self.energy_hwobj.set_wavelength(value)
         #current_energy = self.energy_hwobj.get_energy()
         #self.detector_hwobj.set_photon_energy(value*1000)
+        pass
 
     @task
     def move_motors(self, motor_position_dict):
@@ -586,7 +583,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_detector_distance"
+        # print "***** BESSY141DataCollectA.get_detector_distance"
         if self.detector_distance_hwobj is not None:
             return self.detector_distance_hwobj.getPosition()
 
@@ -594,7 +591,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_detector_distance_limits"
+        # print "***** BESSY141DataCollectA.get_detector_distance_limits"
         #todo
         return 1000
 
@@ -619,6 +616,11 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         _npass = 1
         _number_of_images = oscillation_parameters['number_of_images']
         _comment = "dummy"
+        
+        self.adxv_image_modulo = int(1 / _exptime)
+        if self.adxv_image_modulo < 1 or (experiment_type == "Characterization"):
+            self.adxv_image_modulo = 1
+        self.adxv_number_of_images = _number_of_images
 
         # insert here acq_params dictionary:
         _acq_params = {}
@@ -637,18 +639,16 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         _acq_params["overlap"] = oscillation_parameters["overlap"]
 
         if (experiment_type == "OSC") or (experiment_type == "Helical"):
-            print "prepare_detector: Standard/Helical shutterless data collection"
             # 2017-09-08-mh: customize to BESSY environment
             self.detector_hwobj.prepare_acquisition(
                 _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
                 _comment, _energy, _still, _acq_params)
         elif experiment_type == "Characterization":
-            print "prepare_detector: Characterization"
             self.detector_hwobj.prepare_acquisition_single(
                 _take_dark, _omega_start, _osc_range, _exptime, _npass, _number_of_images,
                 _comment, _energy, _still, _acq_params)
         else:
-           print "prepare_detector: Unknown data collection type"
+           pass
 
         # Preparing directory path for images and processing files
         # creating image file template and jpegs files templates
@@ -671,7 +671,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_transmission"
+        # print "***** BESSY141DataCollectA.get_transmission"
         #todo
         return 100
 
@@ -679,7 +679,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.set_transmission", value
+        # print "***** BESSY141DataCollectA.set_transmission", value
         #todo
         if self.transmission_hwobj is not None:
             self.transmission_hwobj.setTransmission(value)
@@ -688,7 +688,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Return triplet with gaps.
         """
-        print "***** BESSY141DataCollectA.get_undulator_gaps"
+        # print "***** BESSY141DataCollectA.get_undulator_gaps"
         #todo
         return None, None, None
 
@@ -696,7 +696,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_slit_gaps"
+        # print "***** BESSY141DataCollectA.get_slit_gaps"
         #todo
         return None, None
 
@@ -704,7 +704,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_flux"
+        # print "***** BESSY141DataCollectA.get_flux"
         return self.get_measured_intensity()
 
     def collect_status_update(self, status):
@@ -712,42 +712,42 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.collect_status_update", status
+        # print "***** BESSY141DataCollectA.collect_status_update", status
 
     def collect_error_update(self, error_msg):
         """
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.collect_error_update", error_msg
+        # print "***** BESSY141DataCollectA.collect_error_update", error_msg
 
     def update_lims_with_workflow(self, workflow_id, grid_snapshot_filename):
         """
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.update_lims_with_workflow", workflow_id, grid_snapshot_filename
+        # print "***** BESSY141DataCollectA.update_lims_with_workflow", workflow_id, grid_snapshot_filename
 
     def collect_frame_update(self, frame):
         """
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.collect_frame_update", frame
+        # print "***** BESSY141DataCollectA.collect_frame_update", frame
 
     def getBeamlineConfiguration(self, *args):
         """
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.getBeamlineConfiguration"
+        # print "***** BESSY141DataCollectA.getBeamlineConfiguration"
 
     def get_measured_intensity(self):
         """
         Dummy description
         MAXIV implementation has method get_flux?!?
         """
-        print "***** BESSY141DataCollectA.get_measured_intensity"
+        # print "***** BESSY141DataCollectA.get_measured_intensity"
         return 1e99
 
     def setMeshScanParameters(self, num_lines, num_images_per_line, mesh_range):
@@ -755,7 +755,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         Dummy description
         Copied from EMBL implementation. To be checked if really needed.
         """
-        print "***** BESSY141DataCollectA.setMeshScanParameters", num_lines, num_images_per_line, mesh_range
+        # print "***** BESSY141DataCollectA.setMeshScanParameters", num_lines, num_images_per_line, mesh_range
 
     def data_collection_cleanup(self):
         # TO-DO: check if fast shutter is closed in macro
@@ -770,17 +770,13 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
             adxv_notify_socket.sendall("load_image %s\n" % image_filename)
             adxv_notify_socket.close()
         except Exception, err:
-            #logging.info("adxv_notify exception : %r", image_filename)
-            #print Exception, err
+            # logging.info("adxv_notify exception : %r", image_filename)
+            # print Exception, err
             pass
-#       else:
-#           gevent.sleep(3)
         
-    def collect_image_taken_handler(self, frame):
-        print "***** BESSY141DataCollectA.collect_image_taken_handler", frame
-
     def collect_oscillation_finished_handler(self, owner, state, dc_status, collection_id, osc_id, data_collect_parameters):
-        print "***** BESSY141DataCollectA.collect_oscillation_finished_handler", owner, state, dc_status, collection_id, osc_id, data_collect_parameters
+        # print "***** BESSY141DataCollectA.collect_oscillation_finished_handler", owner, state, dc_status, collection_id, osc_id, data_collect_parameters
+        pass
 
     def get_machine_fill_mode(self):
         """
@@ -792,12 +788,12 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         else:
             return ''
     def get_archive_directory(self, directory):
-        print "***** BESSY141DataCollectA.archive_directory", directory
+        # print "***** BESSY141DataCollectA.archive_directory", directory
         archive_dir = os.path.join(directory, "thumbnails")
         return archive_dir
 
     def directoryPrefix(self):
-        print "***** BESSY141DataCollectA.directoryPrefix"
+        # print "***** BESSY141DataCollectA.directoryPrefix"
         dir = os.path.expandvars(self.bl_config.directory_prefix)
         return dir
 
@@ -805,7 +801,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         """
         Dummy description
         """
-        print "***** BESSY141DataCollectA.get_cryo_temperature"
+        # print "***** BESSY141DataCollectA.get_cryo_temperature"
         if self.cryo_hwobj is not None:
             return self.cryo_hwobj.getTemperature()
         else:
@@ -827,7 +823,7 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         Descript. : 
         """
         log = logging.getLogger("user_level_log")
-        print "***** BESSY141DataCollectA.take_crystal_snapshots"
+        # print "***** BESSY141DataCollectA.take_crystal_snapshots"
         #move MD2 to DataCollection phase if it's not
         if self.diffractometer_hwobj.get_current_phase() != "Centring":
             log.info("Moving diffractometer to centring phase")
@@ -844,16 +840,21 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
         self.current_dc_parameters["fileinfo"]["archive_directory"] = save_dir
         
     def last_image_updated(self, value):
-        if value > 0:
-            self.emit("collectImageTaken", int(value))
+        # print "***** BESSY141DataCollectA.last_image_updated", value
+        if value >= 0:
+            self.emit("collectImageTaken", int(value + 1))
 
+    def collect_image_taken_handler(self, frame):
+        # print "***** BESSY141DataCollectA.collect_image_taken_handler", frame
+        if (frame == 1) or (frame == self.adxv_number_of_images) or ((frame % self.adxv_image_modulo) == 0):
             _image_file_template = self.current_dc_parameters["fileinfo"]["template"]
-            _filename = _image_file_template % int(value)
+            _filename = _image_file_template % int(frame)
             _file_location = self.current_dc_parameters["fileinfo"]["directory"]
             _file_path  = os.path.join(_file_location, _filename)
+            last_image_filename = _file_path
 
-            self.last_image_filename = _file_path
+            if self._notify_greenlet is None or self._notify_greenlet.ready():
+                # self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, last_image_filename)
+                self._notify_greenlet = gevent.spawn(self.adxv_notify, last_image_filename)
 
-    def collectImageTakenHandler(self, frame):
-        if self._notify_greenlet is None or self._notify_greenlet.ready():
-            self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+
