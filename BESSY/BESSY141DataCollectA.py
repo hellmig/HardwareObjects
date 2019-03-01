@@ -48,6 +48,10 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
 
         self.exp_type_dict = None
 
+        # 2019-02-12-bessy-mh: helper variables for adxv image tracking during data acquisition
+        self.adxv_number_of_images = -1
+        self.adxv_image_modulo = 9999
+
         self._notify_greenlet = None
         self.connect("collectImageTaken", self.collect_image_taken_handler)
         self.connect("collectOscillationFinished", self.collect_oscillation_finished_handler)
@@ -285,7 +289,10 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
                 _shutterless_exptime = _number_of_images * (_exptime + _detector_dead_time)
 
                 self.oscillation_task = self.oscil(osc_start, osc_end, _shutterless_exptime, 1, _number_of_images, wait=True)
-                self.detector_hwobj.stop()
+                # 2019-02-11-bessy-mh: I don't see the reason to send a stop & reset to the detector after data collection
+                #                      problems with missing last frame for helical data collections
+                #                      maybe move to except-clause????
+                # self.detector_hwobj.stop()
 
                 self.close_safety_shutter()
                 self.close_detector_cover()
@@ -327,7 +334,9 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
                     osc_end = osc_start + _range
                     self.oscillation_task = self.oscil(osc_start, osc_end, _exptime, 1, _number_of_images, wait=True)
 
-                self.detector_hwobj.stop()
+                # 2019-02-11-bessy-mh: I don't see the reason to send a stop & reset to the detector after data collection
+                #                      problems with missing last frame for helical data collections
+                # self.detector_hwobj.stop()
 
                 self.close_safety_shutter()
                 self.close_detector_cover()
@@ -856,5 +865,16 @@ class BESSY141DataCollectA(AbstractCollect, HardwareObject):
             if self._notify_greenlet is None or self._notify_greenlet.ready():
                 # self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, last_image_filename)
                 self._notify_greenlet = gevent.spawn(self.adxv_notify, last_image_filename)
+
+    def stopCollect(self, owner):
+        """
+        Descript. :
+        """
+        # 2019-03-01-bessy-mh: WIP proper implementation of the Stop button during data acquisitions
+        # print "*************** BESSY141DataCollectA.stopCollect"
+        # self.diffractometer_hwobj.abort()  
+        # self.diffractometer_hwobj.wait_device_ready(10)
+        # self.detector_hwobj._detector.getCommandObject("reset")()
+        pass
 
 

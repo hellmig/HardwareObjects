@@ -59,6 +59,9 @@ class BESSY141Microdiff(GenericDiffractometer):
         self.back_light_switch_hwobj = None
         self.front_light_switch_hwobj = None
 
+        # 2019-02-12-bessy-mh:
+        self.minikappa_correction_hwobj = None
+
         # Channels and commands -----------------------------------------------
         self.chan_scintillator_position = None
         self.chan_capillary_position = None
@@ -109,6 +112,7 @@ class BESSY141Microdiff(GenericDiffractometer):
         # self.cmd_start_auto_focus = self.getCommandObject('startAutoFocus')
         # self.cmd_get_omega_scan_limits = self.getCommandObject('getOmegaMotorDynamicScanLimits')
         self.cmd_save_centring_positions = self.getCommandObject('saveCentringPositions')
+        self.cmd_abort = self.getCommandObject('abort')
       
         # front and back light not implemented yet
         self.front_light_hwobj = self.getObjectByRole('frontlight')
