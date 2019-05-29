@@ -6,27 +6,9 @@ import logging
 import gevent
 import socket
 
-
-class CcdDetector143(CcdDetector):
-
-    @task
-    def set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
-      # 2019-03-28-bessy-mh: modify start angle for each written diffraction image
-      # 
-      # alternative solution to add command "self.header["start_phi"] = start" directly to respective method
-      # in detectors/TacoMar.py: Mar225.set_detector_filename without accessing dictionary from outside the module
-      # 
-      # would require more thorough checking and subsequent merge of change into upstream repository (TO-DO?)
-      result = CcdDetector.set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path)
-      if self._detector:
-          self._detector.header["start_phi"] = start
-      return result
-
-
 class BESSY143MultiCollect(BESSYMultiCollect):
     def __init__(self, name):
-        # BESSYMultiCollect.__init__(self, name, CcdDetector(Mar225), FixedEnergy(0.8950, 13.853))
-        BESSYMultiCollect.__init__(self, name, CcdDetector143(Mar225), FixedEnergy(0.8950, 13.853))
+        BESSYMultiCollect.__init__(self, name, CcdDetector(Mar225), FixedEnergy(0.8950, 13.853))
 
         self._notify_greenlet = None
         self.connect("collectImageTaken", self.collectImageTakenHandler)

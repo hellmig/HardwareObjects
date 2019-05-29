@@ -88,6 +88,7 @@ class Mar225:
             self.wait()
         
     def set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path):
+        self.header["start_phi"] = start
         self.header["xtal_to_detector"] = self.collect_obj.get_detector_distance()
         self.header["source_wavelength"] = self.collect_obj.get_wavelength()
         bx, by = self.collect_obj.get_beam_centre()
