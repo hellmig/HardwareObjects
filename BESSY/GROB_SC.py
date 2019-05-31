@@ -131,7 +131,7 @@ class GROB_SC(SampleChanger):
         # initialize the sample changer components
         nbPucks = self.numberOfPucks()
         for i in range (nbPucks):
-            bType = self.puckType(i+1)
+            bType = self.puckType(i)
             if bType == BasketType.Spine:
                 sbasket = SpineBasket(self, i+1)
                 self._addComponent(sbasket)
