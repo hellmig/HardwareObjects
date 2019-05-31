@@ -111,6 +111,10 @@ class Microdiff(MiniDiff.MiniDiff):
         MiniDiff.MiniDiff.init(self)
         self.centringPhiy.direction = -1
 
+        centring_phi_direction = self.getProperty("centring_phi_direction")
+        if centring_phi_direction is not None and centring_phi_direction in [+1, -1]:
+            self.centringPhi.direction = self.centring_phi_direction
+
         try:
             self.grid_direction = eval(self.getProperty("gridDirection"))
         except:
