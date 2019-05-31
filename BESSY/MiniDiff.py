@@ -177,7 +177,7 @@ class MiniDiff(Equipment):
         # mh 2013-11-05:why is the channel read directly? disabled for the moment
         # self.camera.addChannel({ 'type': 'tango', 'name': 'jpegImage' }, "JpegImage")
 
-        self.centringPhi=sample_centring.CentringMotor(self.phiMotor, direction=+1)
+        self.centringPhi=sample_centring.CentringMotor(self.phiMotor, direction=-1)
         self.centringPhiz=sample_centring.CentringMotor(self.phizMotor, reference_position=phiz_ref)
         self.centringPhiy=sample_centring.CentringMotor(self.phiyMotor)
         self.centringSamplex=sample_centring.CentringMotor(self.sampleXMotor)
