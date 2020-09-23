@@ -187,8 +187,10 @@ class BESSYEnergyScan(AbstractEnergyScan, HardwareObject):
             self.storeEnergyScan()
             return
 
+        f.write("MXCuBE energy scan\n")
+        f.write("%d\n" % len(scanData))
         for datatuple in scanData:
-            f.write("%f,%f\r\n" % datatuple)
+            f.write("%f %f\n" % datatuple)
         f.close()
         return
 
