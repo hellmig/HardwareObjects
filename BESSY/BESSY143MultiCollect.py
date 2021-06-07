@@ -1,6 +1,5 @@
 from BESSYMultiCollect import *
-# from detectors.TacoMar import Mar225
-from TacoMar import Mar225
+from detectors.LimaPilatus import Pilatus
 import shutil
 import logging
 import gevent
@@ -8,7 +7,7 @@ import socket
 
 class BESSY143MultiCollect(BESSYMultiCollect):
     def __init__(self, name):
-        BESSYMultiCollect.__init__(self, name, CcdDetector(Mar225), FixedEnergy(0.8950, 13.853))
+        BESSYMultiCollect.__init__(self, name, PixelDetector(Pilatus), FixedEnergy(0.8950, 13.853))
 
         self._notify_greenlet = None
         self.connect("collectImageTaken", self.collectImageTakenHandler)
@@ -100,6 +99,19 @@ class BESSY143MultiCollect(BESSYMultiCollect):
 
     @task
     def write_input_files(self, datacollection_id):
+        # copy *geo_corr.cbf* files to process directory
+        try:
+            process_dir = os.path.join(self.xds_directory, "..")
+            raw_process_dir = os.path.join(self.raw_data_input_file_dir, "..") 
+            for dir in (process_dir, raw_process_dir):
+                for filename in ("x_geo_corr.cbf.bz2", "y_geo_corr.cbf.bz2"):
+                    dest = os.path.join(dir,filename)
+                    if os.path.exists(dest):
+                        continue
+                    shutil.copyfile(os.path.join("/data/id29/inhouse/opid291", filename), dest)
+        except:
+            logging.exception("Exception happened while copying geo_corr files")
+
         return BESSYMultiCollect.write_input_files(self, datacollection_id)
 
     @task
@@ -109,25 +121,24 @@ class BESSY143MultiCollect(BESSYMultiCollect):
         return BESSYMultiCollect.set_detector_filenames(self, frame_number, start, filename, jpeg_full_path, jpeg_thumbnail_full_path)
         
     def adxv_notify(self, image_filename):
-         pass
-#        logging.info("adxv_notify %r", image_filename)
-#        try:
-#            adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#            adxv_notify_socket.connect(("hkl5.psf.bessy.de", 8100))
-#            adxv_notify_socket.sendall("load_image %s\n" % image_filename)
-#            adxv_notify_socket.close()
-#        except Exception, err:
-#            #logging.info("adxv_notify exception : %r", image_filename)
-#            #print Exception, err
-#            pass
-##        else:
-##            gevent.sleep(3)
+        logging.info("adxv_notify %r", image_filename)
+        try:
+            adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            adxv_notify_socket.connect(("hkl6.psf.bessy.de", 8100))
+            adxv_notify_socket.sendall("load_image %s\n" % image_filename)
+            adxv_notify_socket.close()
+        except Exception, err:
+            #logging.info("adxv_notify exception : %r", image_filename)
+            #print Exception, err
+            pass
+#        else:
+#            gevent.sleep(3)
         
     """
     def albula_notify(self, image_filename):
        try:
           albula_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-          albula_socket.connect(('hkl5.psf.bessy.de', 31337))
+          albula_socket.connect(('hkl6.psf.bessy.de', 31337))
       except:
           pass
       else:
@@ -171,4 +182,4 @@ class BESSY143MultiCollect(BESSYMultiCollect):
     def collectOscillationFinished_handler(self, owner, state, dc_status, collection_id, osc_id, data_collect_parameters):
         if self._notify_greenlet is None or self._notify_greenlet.ready():
             self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
-       
+
