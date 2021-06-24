@@ -4,6 +4,7 @@ import shutil
 import logging
 import gevent
 import socket
+import pprint
 
 class BESSY141MultiCollect(BESSYMultiCollect):
     def __init__(self, name):
@@ -180,6 +181,37 @@ class BESSY141MultiCollect(BESSYMultiCollect):
             self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
 
     def collectOscillationFinished_handler(self, owner, state, dc_status, collection_id, osc_id, data_collect_parameters):
+        self._write_xdsapp_autotrigger(owner, state, dc_status, collection_id, osc_id, data_collect_parameters)
         if self._notify_greenlet is None or self._notify_greenlet.ready():
             self._notify_greenlet = gevent.spawn_later(1, self.adxv_notify, self.last_image_filename)
+
+    def _write_xdsapp_autotrigger(self, owner, state, dc_status, collection_id, osc_id, data_collect_parameters):
+
+        dp_pars   = data_collect_parameters
+        #print "\nDATA COLLECT PARS"
+        #print "-------------------------------------------"
+        #pprint.pprint(dp_pars)
+        #print "-------------------------------------------"
+        osc_seq = dp_pars["oscillation_sequence"][0]
+        finfo = dp_pars["fileinfo"]
+        startImageNumber = osc_seq["start_image_number"]
+
+        # process only if data collection successful and standard experiment type
+        if state and (dp_pars["experiment_type"] == "OSC"):
+            # more than 4 images over a range of at least 5 degress must be collected
+            if (osc_seq["number_of_images"] > 4) and (((osc_seq["number_of_images"] - 1)*osc_seq["range"]) >= 5):
+                image_filename = finfo["template"] % (startImageNumber)
+                image_full_path = os.path.join(finfo["directory"], image_filename)
+
+                xdsapp_trigger_file = os.path.join(self.xdsapp_raw_data_input_file_dir, "xdsapp.autoproc-trigger")
+
+                try:
+                    xdsapp_file = open(xdsapp_trigger_file, "w")
+                    xdsapp_file.write(image_full_path)
+                    xdsapp_file.close()
+                except:
+                    import traceback
+                    traceback.print_exc()
+
+
        
