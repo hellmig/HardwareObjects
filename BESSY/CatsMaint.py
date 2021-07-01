@@ -22,6 +22,7 @@ __status__ = "Alpha"
 class CatsMaint(Equipment):
     __TYPE__ = "CATS"    
     NO_OF_LIDS = 3
+    TOOL_ID = 5
 
     """
     Actual implementation of the CATS Sample Changer, MAINTENANCE COMMANDS ONLY
@@ -42,8 +43,9 @@ class CatsMaint(Equipment):
         self._chnLN2Regulation = self.getChannelObject("_chnLN2RegulationDewar1")
         self._chnLN2Regulation.connectSignal("update", self._updateRegulationState)
            
-        for command_name in ("_cmdReset","_cmdDry","_cmdOpenTool","_cmdCloseTool", "_cmdCalibration","_cmdSetOnDiff", "_cmdClearMemory","_cmdResetParameters","_cmdBack", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
+        for command_name in ("_cmdReset","_cmdOpenTool","_cmdCloseTool", "_cmdCalibration","_cmdSetOnDiff", "_cmdClearMemory","_cmdResetParameters","_cmdBack", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
                              "_cmdOpenLid1", "_cmdCloseLid1", "_cmdOpenLid2", "_cmdCloseLid2", "_cmdOpenLid3", "_cmdCloseLid3", \
+                             "_cmdBackToolA", "_cmdBackToolB", "_cmdDry", "_cmdSoak", \
                              "_cmdRegulOn"):
             setattr(self, command_name, self.getCommandObject(command_name))
 
@@ -54,6 +56,30 @@ class CatsMaint(Equipment):
                 getattr(self, channel_name).connectSignal("update", getattr(self, "_updateLid%dState" % (lid_index + 1)))
 
     ################################################################################
+ 
+    def dryToolTraj(self):    
+        """
+        Dries the gripper.
+        """
+        return self._executeTask(False,self._doDryTool)
+
+    def soakToolTraj(self):
+        """
+        Cools the gripper by moving into the technical port in the dewar.
+        """
+        return self._executeTask(False,self._doSoakTool)
+ 
+    def backToolATraj(self):
+        """
+        Moves a sample from the gripper tool A back into the dewar to its logged position.
+        """
+        return self._executeTask(False,self._doBackToolA)
+
+    def backToolBTraj(self):    
+        """
+        Moves a sample from the gripper tool B back into the dewar to its logged position.
+        """    
+        return self._executeTask(False,self._doBackToolB)     
 
     def backTraj(self):    
         """
@@ -103,7 +129,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        self._cmdCalibration(2)
+        self._cmdCalibration(5)
 
     def _doOpenTool(self):
         """
@@ -123,16 +149,6 @@ class CatsMaint(Equipment):
         """
         self._cmdCloseTool()
 
-    def _doDryGripper(self):
-        """
-        Launch the "dry" command on the CATS Tango DS
-
-        :returns: None
-        :rtype: None
-        """
-        self._cmdDry(2)
-      
-
     def _doSetOnDiff(self, sample):
         """
         Launch the "setondiff" command on the CATS Tango DS, an example of sample value is 2:05
@@ -148,10 +164,50 @@ class CatsMaint(Equipment):
             sample_tmp=str_tmp.split(":")
             # calculate CATS specific lid/sample number
             lid = (int(sample_tmp[0]) - 1) / 3 + 1
-            puc_pos = ((int(sample_tmp[0]) - 1) % 3) * 10 + int(sample_tmp[1])
+            puc_pos = ((int(sample_tmp[0]) - 1) % 3) * 16 + int(sample_tmp[1])
             argin = [ str(lid), str(puc_pos), "0"]
             logging.getLogger().info("to SetOnDiff %s", argin)
             self._executeServerTask(self._cmdSetOnDiff,argin)
+            
+    def _doDryTool(self):
+        """
+        Launch the "dry" trajectory on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        argin = CatsMaint.TOOL_ID
+        self._executeServerTask(self._cmdDry, argin)
+
+    def _doSoakTool(self):
+        """
+        Launch the "soak" trajectory on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        argin = [str(CatsMaint.TOOL_ID), "2"] # use the technical port in Lid 2 for the soaking
+        self._executeServerTask(self._cmdSoak, argin)
+
+    def _doBackToolA(self):
+        """
+        Launch the "backA" trajectory on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        argin = CatsMaint.TOOL_ID
+        self._executeServerTask(self._cmdBackToolA, argin)
+
+    def _doBackToolB(self):
+        """
+        Launch the "backB" trajectory on the CATS Tango DS
+
+        :returns: None
+        :rtype: None
+        """
+        argin = CatsMaint.TOOL_ID
+        self._executeServerTask(self._cmdBackToolB, argin)
 
     def _doBack(self):
         """
@@ -160,7 +216,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        argin = 2
+        argin = CatsMaint.TOOL_ID
         self._executeServerTask(self._cmdBack, argin)
 
     def _doSafe(self):
@@ -170,7 +226,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        argin = 2
+        argin = CatsMaint.TOOL_ID
         self._executeServerTask(self._cmdSafe, argin)
 
     def _doPowerState(self, state=False):
