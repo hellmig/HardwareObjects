@@ -490,6 +490,8 @@ class BESSYMultiCollect(AbstractMultiCollect, HardwareObject):
 
           i+=1
 
+        xdsapp_input_file_dirname = "xdsapp_%s_run%s_%d" % (prefix, run_number, i)
+
         mosflm_input_file_dirname = "mosflm_%s_run%s_%d" % (prefix, run_number, i)
         mosflm_directory = os.path.join(process_directory, mosflm_input_file_dirname)
 
@@ -497,10 +499,11 @@ class BESSYMultiCollect(AbstractMultiCollect, HardwareObject):
         hkl2000_directory = os.path.join(process_directory, hkl2000_dirname)
 
         self.raw_data_input_file_dir = os.path.join(files_directory, "process", xds_input_file_dirname)
+        self.xdsapp_raw_data_input_file_dir = os.path.join(files_directory, "process", xdsapp_input_file_dirname)
         self.mosflm_raw_data_input_file_dir = os.path.join(files_directory, "process", mosflm_input_file_dirname)
         self.raw_hkl2000_dir = os.path.join(files_directory, "process", hkl2000_dirname)
 
-        for dir in (self.raw_data_input_file_dir, xds_directory):
+        for dir in (self.raw_data_input_file_dir, xds_directory, self.xdsapp_raw_data_input_file_dir):
           self.create_directories(dir)
           logging.info("Creating XDS processing input file directory: %s", dir)
           os.chmod(dir, 0777)
