@@ -100,6 +100,10 @@ class Cats144(SampleChanger):
         if self._lidStatus is not None:
             self._lidStatus.connectSignal("update", self._updateOperationMode)
 
+        for channel_name in ("_chnLid1Open", "_chnLid2Open", "_chnLid3Open"):
+            setattr(self, channel_name, self.getChannelObject(channel_name))
+           
+
         self._initSCContents()
 
         # SampleChanger.init must be called _after_ initialization of the Cats because it starts the update methods which access
@@ -206,7 +210,7 @@ class Cats144(SampleChanger):
             # self._executeServerTask(self._scan_samples, [component.getIndex()+1,])
             lid = ((selected.getBasketNo() - 1) / 3) + 1
             sample = (((selected.getBasketNo() - 1) % 3) * Basket.NO_OF_SAMPLES_PER_PUCK) + selected.getVialNo()
-            argin = [TOOL_ID, str(lid), str(sample), "0", "0"]
+            argin = [Cats144.TOOL_ID, str(lid), str(sample), "0", "0"]
             self._executeServerTask(self._cmdScanSample, argin)
             self._updateSampleBarcode(component)
         elif isinstance(component, Container) and ( component.getType() == Basket.__TYPE__):
@@ -221,7 +225,7 @@ class Cats144(SampleChanger):
                 for sample_index in range(Basket.NO_OF_SAMPLES_PER_PUCK):
                     lid = ((selected.getBasketNo() - 1) / 3) + 1
                     sample = (((selected.getBasketNo() - 1) % 3) * Basket.NO_OF_SAMPLES_PER_PUCK) + (sample_index+1)
-                    argin = [TOOL_ID, str(lid), str(sample), "0", "0"]
+                    argin = [Cats144.TOOL_ID, str(lid), str(sample), "0", "0"]
                     self._executeServerTask(self._cmdScanSample, argin)
         elif isinstance(component, Container) and ( component.getType() == SC3.__TYPE__):
             for basket in self.getComponents():
@@ -257,7 +261,7 @@ class Cats144(SampleChanger):
         # calculate CATS specific lid/sample number
         lid = ((selected.getBasketNo() - 1) / 3) + 1
         sample = (((selected.getBasketNo() - 1) % 3) * Basket.NO_OF_SAMPLES_PER_PUCK) + selected.getVialNo()
-        argin = [TOOL_ID, str(lid), str(sample), "0", "0", "0", "0", "0"]
+        argin = [Cats144.TOOL_ID, str(lid), str(sample), "0", "0", "0", "0", "0"]
             
         loadedsample = self.getLoadedSample()
         selectedsample = self.getSelectedSample()
@@ -287,7 +291,7 @@ class Cats144(SampleChanger):
             
         if (sample_slot is not None):
             self._doSelect(sample_slot)
-        argin = [TOOL_ID, "0", "0", "0", "0"]
+        argin = [Cats144.TOOL_ID, "0", "0", "0", "0"]
         self._executeServerTask(self._cmdUnload, argin)
 
     def clearBasketInfo(self, basket):
@@ -310,7 +314,8 @@ class Cats144(SampleChanger):
     #########################           PRIVATE           #########################        
 
     def _updateOperationMode(self, value):
-        self._scIsCharging = not value
+        # self._scIsCharging = not value
+        self._scIsCharging = self._chnLid1Open.getValue() or self._chnLid2Open.getValue() or self._chnLid3Open.getValue()
 
     def _executeServerTask(self, method, *args):
         """

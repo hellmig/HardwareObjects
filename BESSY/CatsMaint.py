@@ -43,7 +43,7 @@ class CatsMaint(Equipment):
         self._chnLN2Regulation = self.getChannelObject("_chnLN2RegulationDewar1")
         self._chnLN2Regulation.connectSignal("update", self._updateRegulationState)
            
-        for command_name in ("_cmdReset","_cmdOpenTool","_cmdCloseTool", "_cmdCalibration","_cmdSetOnDiff", "_cmdClearMemory","_cmdResetParameters","_cmdBack", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
+        for command_name in ("_cmdReset","_cmdOpenTool","_cmdCloseTool", "_cmdCalibration","_cmdSetOnDiff", "_cmdClearMemory","_cmdResetParameters","_cmdBack", "_cmdAbort", "_cmdSafe", "_cmdPowerOn", "_cmdPowerOff", \
                              "_cmdOpenLid1", "_cmdCloseLid1", "_cmdOpenLid2", "_cmdCloseLid2", "_cmdOpenLid3", "_cmdCloseLid3", \
                              "_cmdBackToolA", "_cmdBackToolB", "_cmdDry", "_cmdSoak", \
                              "_cmdRegulOn"):
@@ -196,7 +196,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        argin = CatsMaint.TOOL_ID
+        argin = [str(CatsMaint.TOOL_ID), "0"]
         self._executeServerTask(self._cmdBackToolA, argin)
 
     def _doBackToolB(self):
@@ -206,7 +206,7 @@ class CatsMaint(Equipment):
         :returns: None
         :rtype: None
         """
-        argin = CatsMaint.TOOL_ID
+        argin = [str(CatsMaint.TOOL_ID), "0"]
         self._executeServerTask(self._cmdBackToolB, argin)
 
     def _doBack(self):
