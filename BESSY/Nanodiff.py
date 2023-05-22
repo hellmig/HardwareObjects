@@ -650,27 +650,27 @@ class Nanodiff(Equipment):
         return
 
     def _loadRequestStateChanged(self, value):
-        # print "Nanodiff._loadRequestStateChanged", value
-        if value:
-            # Load request received, try to go to transfer phase
-            self._enableGonioTransferPhase()
-        else:
-            # Load request disabled
-            if self.sampleChanger is not None:
-                if self.sampleChanger.sampleIsDetected() and self.sampleChanger.armIsOutOfGonioArea():
-                    if self._cmdStartCentringPhase is not None:
-                        self._cmdStartCentringPhase()
+        print "Nanodiff._loadRequestStateChanged", value
+        #if value:
+        #    # Load request received, try to go to transfer phase
+        #    self._enableGonioTransferPhase()
+        #else:
+        #    # Load request disabled
+        #    if self.sampleChanger is not None:
+        #        if self.sampleChanger.sampleIsDetected() and self.sampleChanger.armIsOutOfGonioArea():
+        #            if self._cmdStartCentringPhase is not None:
+        #                self._cmdStartCentringPhase()
 
     def _unloadRequestStateChanged(self, value):
-        # print "Nanodiff._unloadRequestStateChanged", value
-        if value:
-            # Unload request received, try to go to transfer phase
-            self._enableGonioTransferPhase()
+        print "Nanodiff._unloadRequestStateChanged", value
+        #if value:
+        #    # Unload request received, try to go to transfer phase
+        #    self._enableGonioTransferPhase()
 
     def _enableGonioTransferPhase(self):
-        # print "Nanodiff._enableGonioTransferPhase"
-        if self._chnNanodiffCurrentPhase:
-            if self._chnNanodiffCurrentPhase.getValue() != "Sample Transfer":
+        print "Nanodiff._enableGonioTransferPhase"
+        #if self._chnNanodiffCurrentPhase:
+        #    if self._chnNanodiffCurrentPhase.getValue() != "Sample Transfer":
 
-                if self._cmdStartTransferPhase is not None:
-                    self._cmdStartTransferPhase()
+        #        if self._cmdStartTransferPhase is not None:
+        #            self._cmdStartTransferPhase()
