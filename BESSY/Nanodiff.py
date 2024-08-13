@@ -189,6 +189,10 @@ class Nanodiff(Equipment):
         if self._chnUnloadStateRequest is not None:
             self._chnUnloadStateRequest.connectSignal("update", self._unloadRequestStateChanged)
 
+        # 2023-06-15-bessy-mh: begin - channels for automatic change to centring phase
+        for channel_name in ("_chnSampleDetected","_chnSCOutOfGonioArea"):
+            setattr(self, channel_name, self.getChannelObject(channel_name))
+
         for commande_name in ("_cmdStartTransferPhase", "_cmdStartCentringPhase"):
             setattr(self, commande_name, self.getCommandObject(commande_name))
         # 2017-08-28-bessy-mh: end
@@ -650,27 +654,29 @@ class Nanodiff(Equipment):
         return
 
     def _loadRequestStateChanged(self, value):
-        print "Nanodiff._loadRequestStateChanged", value
-        #if value:
-        #    # Load request received, try to go to transfer phase
-        #    self._enableGonioTransferPhase()
-        #else:
-        #    # Load request disabled
-        #    if self.sampleChanger is not None:
-        #        if self.sampleChanger.sampleIsDetected() and self.sampleChanger.armIsOutOfGonioArea():
-        #            if self._cmdStartCentringPhase is not None:
-        #                self._cmdStartCentringPhase()
+        print "Nanodiff._loadRequestStateChanged", value, type(value), int(value)
+        if int(value) == 2:
+            # Load request received, try to go to transfer phase
+            self._enableGonioTransferPhase()
+        elif int(value) == 3:
+            if self._chnSampleDetected and self._chnSCOutOfGonioArea:
+                sample_detected = self._chnSampleDetected.getValue()
+                sc_safe = int(self._chnSCOutOfGonioArea.getValue())
+                if sample_detected and sc_safe:
+                    if self._cmdStartCentringPhase is not None:
+                        self._cmdStartCentringPhase()
+        else:
+            pass
 
     def _unloadRequestStateChanged(self, value):
-        print "Nanodiff._unloadRequestStateChanged", value
-        #if value:
-        #    # Unload request received, try to go to transfer phase
-        #    self._enableGonioTransferPhase()
+        # print "Nanodiff._unloadRequestStateChanged", value
+        if value and (int(self._chnLoadStateRequest.getValue()) != 2):
+            # Unload request received, try to go to transfer phase
+            self._enableGonioTransferPhase()
 
     def _enableGonioTransferPhase(self):
-        print "Nanodiff._enableGonioTransferPhase"
-        #if self._chnNanodiffCurrentPhase:
-        #    if self._chnNanodiffCurrentPhase.getValue() != "Sample Transfer":
-
-        #        if self._cmdStartTransferPhase is not None:
-        #            self._cmdStartTransferPhase()
+        # print "Nanodiff._enableGonioTransferPhase"
+        if self._chnNanodiffCurrentPhase:
+            if self._chnNanodiffCurrentPhase.getValue() not in ["Sample Transfer", "<Phase change>"]:
+                if self._cmdStartTransferPhase is not None:
+                    self._cmdStartTransferPhase()

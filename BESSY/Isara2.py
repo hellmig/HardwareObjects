@@ -328,20 +328,23 @@ class Isara2(SampleChanger):
         try:
           state = self._readState()
         except:
+          print "*** _updateState exception"
           state = SampleChangerState.Unknown
 
-        if state == SampleChangerState.Moving and self._isDeviceBusy(self.getState()):
-            #print "*** _updateState return"
+        # print "*** _updateState1: ", state
+        # if state == SampleChangerState.Moving and self._isDeviceBusy(self.getState()):
+        if state == SampleChangerState.Moving:
+            # print "*** _updateState return"
             return          
-        if self.hasLoadedSample() ^ self._chnSampleIsDetected.getValue():
+        if self._chnPathRunning.getValue() and not (state in [SampleChangerState.Loading, SampleChangerState.Unloading]):
+            state = SampleChangerState.Moving
+        elif self.hasLoadedSample() ^ self._chnSampleIsDetected.getValue():
             # go to Unknown state if a sample is detected on the gonio but not registered in the internal database
             # or registered but not on the gonio anymore
             state = SampleChangerState.Unknown
-        elif self._chnPathRunning.getValue() and not (state in [SampleChangerState.Loading, SampleChangerState.Unloading]):
-            state = SampleChangerState.Moving
         elif self._scIsCharging and not (state in [SampleChangerState.Alarm, SampleChangerState.Moving, SampleChangerState.Loading, SampleChangerState.Unloading]):
             state = SampleChangerState.Charging
-        # print "*** _updateState: ", state
+        # print "*** _updateState2: ", state
         self._setState(state)
        
     def _readState(self):
@@ -352,12 +355,12 @@ class Isara2(SampleChanger):
         :rtype: GenericSampleChanger.SampleChangerState
         """
         state = self._chnState.getValue()
-        # print "*** _readState1: ", state
         if state is not None:
             stateStr = str(state).upper()
         else:
             stateStr = ""
         # state = str(self._state.getValue() or "").upper()
+        # print "*** _readState1: ", stateStr
         state_converter = { "ALARM": SampleChangerState.Alarm,
                             "ON": SampleChangerState.Ready,
                             "OFF": SampleChangerState.StandBy,

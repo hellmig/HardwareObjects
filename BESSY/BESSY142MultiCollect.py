@@ -125,7 +125,7 @@ class BESSY142MultiCollect(BESSYMultiCollect):
         logging.info("adxv_notify %r", image_filename)
         try:
             adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            adxv_notify_socket.connect(("hkl7.psf.bessy.de", 8100))
+            adxv_notify_socket.connect(("hkl7.exp1401.bessy.de", 8100))
             adxv_notify_socket.sendall("load_image %s\n" % image_filename)
             adxv_notify_socket.close()
         except Exception, err:

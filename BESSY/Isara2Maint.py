@@ -40,6 +40,7 @@ class Isara2Maint(Equipment):
         for command_name in ("_cmdReset","_cmdBack", "_cmdAbort", "_cmdRecover", "_cmdPowerOn", "_cmdPowerOff", \
                              "_cmdOpenLid1", "_cmdCloseLid1", \
                              "_cmdDry", "_cmdSoak", \
+                             "_cmdStatus", \
                              "_cmdRegulOn"):
             setattr(self, command_name, self.getCommandObject(command_name))
             
@@ -89,6 +90,7 @@ class Isara2Maint(Equipment):
         :rtype: None
         """
         self._cmdReset()
+        self._cmdStatus()
 
     def _doDryTool(self):
         """
