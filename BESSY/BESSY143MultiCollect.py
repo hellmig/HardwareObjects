@@ -125,7 +125,7 @@ class BESSY143MultiCollect(BESSYMultiCollect):
         logging.info("adxv_notify %r", image_filename)
         try:
             adxv_notify_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            adxv_notify_socket.connect(("hkl6.psf.bessy.de", 8100))
+            adxv_notify_socket.connect(("hkl6.exp1401.bessy.de", 8100))
             adxv_notify_socket.sendall("load_image %s\n" % image_filename)
             adxv_notify_socket.close()
         except Exception, err:
@@ -139,7 +139,7 @@ class BESSY143MultiCollect(BESSYMultiCollect):
     def albula_notify(self, image_filename):
        try:
           albula_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-          albula_socket.connect(('hkl6.psf.bessy.de', 31337))
+          albula_socket.connect(('hkl6.exp1401.bessy.de', 31337))
       except:
           pass
       else:
