@@ -446,11 +446,9 @@ class AbstractMultiCollect(object):
             data_collect_parameters["status"] = "failed"
 
             logging.getLogger("user_level_log").info("Storing data collection in LIMS")
-            (self.collection_id, detector_id) = \
-                                 self.bl_control.lims.store_data_collection(data_collect_parameters, self.bl_config)
-              
-            data_collect_parameters['collection_id'] = self.collection_id
+            (self.collection_id, detector_id) = self.bl_control.lims.store_data_collection(data_collect_parameters, self.bl_config)
 
+            data_collect_parameters['collection_id'] = self.collection_id
             if detector_id:
                 data_collect_parameters['detector_id'] = detector_id
               
